@@ -49,6 +49,10 @@ function V1AppContent() {
   const handleCreateProject = async (formData: ProjectFormData) => {
     await createNewProject({
       title: formData.title,
+      clientName: formData.clientName,
+      speakerName: formData.speakerName,
+      companyName: formData.companyName,
+      contactEmail: formData.contactEmail,
       buildTranscript: formData.buildTranscript,
       intakeTranscript: formData.intakeTranscript,
       operatorNotes: formData.operatorNotes,
