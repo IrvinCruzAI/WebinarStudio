@@ -23,8 +23,9 @@ const ALLOWED_FIELDS: Record<string, Record<string, string[]>> = {
     'missing_context[]': ['field', 'why_it_matters', 'example_answer'],
   },
   WR1: {
-    _root: ['parsed_intake', 'cleaned_transcript', 'structured_notes', 'main_themes', 'speaker_insights', 'proof_points', 'qa'],
+    _root: ['parsed_intake', 'executive_summary', 'cleaned_transcript', 'structured_notes', 'main_themes', 'speaker_insights', 'proof_points', 'qa', 'edited_fields'],
     parsed_intake: ['client_name', 'company', 'webinar_title', 'offer', 'target_audience', 'tone', 'primary_cta_type', 'speaker_name', 'speaker_title'],
+    executive_summary: ['overview', 'key_points'],
     'proof_points[]': ['type', 'content', 'source'],
     qa: ['assumptions', 'placeholders', 'claims_requiring_proof'],
   },
@@ -764,6 +765,15 @@ function canonicalizeWR1(content: unknown, changes: NormalizationChange[]): unkn
       result.parsed_intake as Record<string, unknown>,
       ALLOWED_FIELDS.WR1.parsed_intake,
       'parsed_intake',
+      changes
+    );
+  }
+
+  if (result.executive_summary && typeof result.executive_summary === 'object') {
+    result.executive_summary = stripUnknownFields(
+      result.executive_summary as Record<string, unknown>,
+      ALLOWED_FIELDS.WR1.executive_summary,
+      'executive_summary',
       changes
     );
   }
