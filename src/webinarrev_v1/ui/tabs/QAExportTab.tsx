@@ -876,6 +876,15 @@ function BugAlertSection({ count }: { count: number }) {
   );
 }
 
+interface GroupedPlaceholder {
+  fieldName: string;
+  occurrences: number;
+  critical: boolean;
+  deliverableIds: Set<string>;
+  samplePath: string;
+  sampleText: string;
+}
+
 function PlaceholderManager({
   placeholders,
   onNavigateToFix,
@@ -886,12 +895,34 @@ function PlaceholderManager({
   const [showCriticalOnly, setShowCriticalOnly] = useState(false);
   const filtered = showCriticalOnly ? placeholders.filter(p => p.critical) : placeholders;
 
-  const groupedByAsset = filtered.reduce((acc, p) => {
-    const key = p.deliverableId;
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(p);
+  const dedupedByField = filtered.reduce((acc, p) => {
+    const fieldName = translatePlaceholder(p.text, p.path);
+    const key = `${fieldName}`;
+
+    if (!acc[key]) {
+      acc[key] = {
+        fieldName,
+        occurrences: 0,
+        critical: p.critical,
+        deliverableIds: new Set(),
+        samplePath: p.path,
+        sampleText: p.text,
+      };
+    }
+
+    acc[key].occurrences++;
+    acc[key].deliverableIds.add(p.deliverableId);
+    acc[key].critical = acc[key].critical || p.critical;
+
     return acc;
-  }, {} as Record<string, PlaceholderMatch[]>);
+  }, {} as Record<string, GroupedPlaceholder>);
+
+  const groupedByAsset = Object.values(dedupedByField).reduce((acc, item) => {
+    const primaryAsset = Array.from(item.deliverableIds)[0];
+    if (!acc[primaryAsset]) acc[primaryAsset] = [];
+    acc[primaryAsset].push(item);
+    return acc;
+  }, {} as Record<string, GroupedPlaceholder[]>);
 
   return (
     <div
@@ -958,8 +989,10 @@ function PlaceholderManager({
               </div>
 
               <div className="space-y-2">
-                {items.map((placeholder, i) => {
-                  const friendlyName = translatePlaceholder(placeholder.text, placeholder.path);
+                {items.map((item, i) => {
+                  const affectedAssets = Array.from(item.deliverableIds);
+                  const showOccurrences = item.occurrences > 1 || affectedAssets.length > 1;
+
                   return (
                     <div
                       key={i}
@@ -967,18 +1000,38 @@ function PlaceholderManager({
                       style={{ background: 'rgb(var(--surface-base))' }}
                     >
                       <div className="flex items-center gap-3">
-                        {placeholder.critical ? (
+                        {item.critical ? (
                           <XCircle className="w-4 h-4 flex-shrink-0" style={{ color: 'rgb(var(--error))' }} />
                         ) : (
                           <Edit3 className="w-4 h-4 flex-shrink-0" style={{ color: 'rgb(var(--warning))' }} />
                         )}
                         <div>
-                          <p className="text-sm" style={{ color: 'rgb(var(--text-primary))' }}>
-                            {friendlyName}
-                          </p>
-                          {placeholder.critical && (
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm" style={{ color: 'rgb(var(--text-primary))' }}>
+                              {item.fieldName}
+                            </p>
+                            {showOccurrences && (
+                              <span
+                                className="text-xs px-1.5 py-0.5 rounded-full"
+                                style={{
+                                  background: 'rgb(var(--text-muted) / 0.1)',
+                                  color: 'rgb(var(--text-muted))'
+                                }}
+                              >
+                                {item.occurrences}x
+                                {affectedAssets.length > 1 && ` across ${affectedAssets.length} assets`}
+                              </span>
+                            )}
+                          </div>
+                          {item.critical ? (
                             <p className="text-xs" style={{ color: 'rgb(var(--error))' }}>
                               Required for export
+                            </p>
+                          ) : (
+                            <p className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+                              {affectedAssets.length > 1
+                                ? `Used in ${affectedAssets.map(id => getAssetName(id as DeliverableId)).join(', ')}`
+                                : 'Optional but recommended'}
                             </p>
                           )}
                         </div>
