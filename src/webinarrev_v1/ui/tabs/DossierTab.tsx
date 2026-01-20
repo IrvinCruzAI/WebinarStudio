@@ -371,6 +371,7 @@ export function DossierTab({
               expanded={expandedSections.has('themes')}
               onToggle={() => toggleSection('themes')}
               completeness={getThemesCompleteness(wr1)}
+              highlight="strategic"
             >
               <div className="space-y-4">
                 <ArrayDisplay label="Main Themes" items={wr1.main_themes} highlight />
