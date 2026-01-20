@@ -655,19 +655,22 @@ function ProfileField({
 }) {
   return (
     <div
-      className="p-3 rounded-xl"
+      className="p-4 rounded-xl"
       style={{
-        background: 'rgb(var(--surface-base))',
-        border: '1px solid rgb(var(--border-subtle))',
+        background: value ? 'rgb(var(--surface-base))' : 'rgb(var(--surface-elevated))',
+        border: value ? '1px solid rgb(var(--border-default))' : '1px solid rgb(var(--border-default) / 0.5)',
       }}
     >
-      <label className="text-xs font-medium uppercase tracking-wide flex items-center gap-1.5" style={{ color: 'rgb(var(--text-muted))' }}>
-        {Icon && <Icon className="w-3 h-3" />}
+      <label className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 mb-2" style={{ color: 'rgb(var(--text-muted))' }}>
+        {Icon && <Icon className="w-3.5 h-3.5" />}
         {label}
       </label>
       <p
-        className="mt-1 text-sm font-medium"
-        style={{ color: value ? 'rgb(var(--text-primary))' : 'rgb(var(--text-muted))' }}
+        className="text-sm font-medium"
+        style={{
+          color: value ? 'rgb(var(--text-primary))' : 'rgb(var(--text-secondary))',
+          opacity: value ? '1' : '0.7'
+        }}
       >
         {value || 'Not specified'}
       </p>
