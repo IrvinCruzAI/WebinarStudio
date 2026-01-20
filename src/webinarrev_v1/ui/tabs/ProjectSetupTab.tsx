@@ -20,6 +20,7 @@ import {
   Copy,
   Check,
   Thermometer,
+  X,
 } from 'lucide-react';
 import type { CTA, AudienceTemperature } from '../../contracts';
 import type { ProjectMetadata, DeliverableId, WR1 } from '../../contracts';
@@ -75,6 +76,11 @@ export function ProjectSetupTab({
   const [editedAudienceTemp, setEditedAudienceTemp] = useState<AudienceTemperature>(project.settings.audience_temperature);
   const [editedDuration, setEditedDuration] = useState(project.settings.webinar_length_minutes);
   const [configChanged, setConfigChanged] = useState(false);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [editedClientName, setEditedClientName] = useState(project.settings?.client_name || '');
+  const [editedSpeakerName, setEditedSpeakerName] = useState(project.settings?.speaker_name || '');
+  const [editedCompanyName, setEditedCompanyName] = useState(project.settings?.company_name || '');
+  const [editedContactEmail, setEditedContactEmail] = useState(project.settings?.contact_email || '');
 
   useEffect(() => {
     loadTranscripts();
@@ -86,6 +92,11 @@ export function ProjectSetupTab({
     setEditedDuration(project.settings.webinar_length_minutes);
     setConfigChanged(false);
     setIsEditingConfig(false);
+    setEditedClientName(project.settings?.client_name || '');
+    setEditedSpeakerName(project.settings?.speaker_name || '');
+    setEditedCompanyName(project.settings?.company_name || '');
+    setEditedContactEmail(project.settings?.contact_email || '');
+    setIsEditingProfile(false);
   }, [project.project_id, project.settings]);
 
   const handleSaveConfig = () => {
@@ -109,6 +120,26 @@ export function ProjectSetupTab({
     setEditedAudienceTemp(project.settings.audience_temperature);
     setEditedDuration(project.settings.webinar_length_minutes);
     setIsEditingConfig(false);
+  };
+
+  const handleSaveProfile = () => {
+    if (onSettingsChange) {
+      onSettingsChange({
+        client_name: editedClientName.trim() || undefined,
+        speaker_name: editedSpeakerName.trim() || undefined,
+        company_name: editedCompanyName.trim() || undefined,
+        contact_email: editedContactEmail.trim() || undefined,
+      });
+    }
+    setIsEditingProfile(false);
+  };
+
+  const handleCancelProfileEdit = () => {
+    setEditedClientName(project.settings?.client_name || '');
+    setEditedSpeakerName(project.settings?.speaker_name || '');
+    setEditedCompanyName(project.settings?.company_name || '');
+    setEditedContactEmail(project.settings?.contact_email || '');
+    setIsEditingProfile(false);
   };
 
   const loadTranscripts = async () => {
@@ -213,28 +244,109 @@ export function ProjectSetupTab({
           expanded={expandedSections.has('profile')}
           onToggle={() => toggleSection('profile')}
         >
-          <div className="grid grid-cols-2 gap-4">
-            <ProfileField
-              label="Client Name"
-              value={project.settings?.client_name}
-              icon={User}
-            />
-            <ProfileField
-              label="Company"
-              value={project.settings?.company_name}
-              icon={Building2}
-            />
-            <ProfileField
-              label="Speaker Name"
-              value={project.settings?.speaker_name}
-              icon={User}
-            />
-            <ProfileField
-              label="Contact Email"
-              value={project.settings?.contact_email}
-              icon={Mail}
-            />
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+              {isEditingProfile ? 'Edit profile details' : 'Click Edit to update profile information'}
+            </span>
+            <div className="flex items-center gap-2">
+              {isEditingProfile ? (
+                <>
+                  <button onClick={handleCancelProfileEdit} className="btn-ghost text-xs">
+                    <X className="w-3.5 h-3.5" />
+                    Cancel
+                  </button>
+                  <button onClick={handleSaveProfile} className="btn-primary text-xs">
+                    <Check className="w-3.5 h-3.5" />
+                    Save
+                  </button>
+                </>
+              ) : (
+                <button onClick={() => setIsEditingProfile(true)} className="btn-secondary text-xs">
+                  <Edit3 className="w-3.5 h-3.5" />
+                  Edit
+                </button>
+              )}
+            </div>
           </div>
+          {isEditingProfile ? (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 mb-2" style={{ color: 'rgb(var(--text-muted))' }}>
+                  <User className="w-3.5 h-3.5" />
+                  Client Name
+                </label>
+                <input
+                  type="text"
+                  value={editedClientName}
+                  onChange={e => setEditedClientName(e.target.value)}
+                  className="input-field text-sm"
+                  placeholder="Client or business name"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 mb-2" style={{ color: 'rgb(var(--text-muted))' }}>
+                  <Building2 className="w-3.5 h-3.5" />
+                  Company
+                </label>
+                <input
+                  type="text"
+                  value={editedCompanyName}
+                  onChange={e => setEditedCompanyName(e.target.value)}
+                  className="input-field text-sm"
+                  placeholder="Company or organization"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 mb-2" style={{ color: 'rgb(var(--text-muted))' }}>
+                  <User className="w-3.5 h-3.5" />
+                  Speaker Name
+                </label>
+                <input
+                  type="text"
+                  value={editedSpeakerName}
+                  onChange={e => setEditedSpeakerName(e.target.value)}
+                  className="input-field text-sm"
+                  placeholder="Speaker or presenter name"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 mb-2" style={{ color: 'rgb(var(--text-muted))' }}>
+                  <Mail className="w-3.5 h-3.5" />
+                  Contact Email
+                </label>
+                <input
+                  type="email"
+                  value={editedContactEmail}
+                  onChange={e => setEditedContactEmail(e.target.value)}
+                  className="input-field text-sm"
+                  placeholder="contact@example.com"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              <ProfileField
+                label="Client Name"
+                value={project.settings?.client_name}
+                icon={User}
+              />
+              <ProfileField
+                label="Company"
+                value={project.settings?.company_name}
+                icon={Building2}
+              />
+              <ProfileField
+                label="Speaker Name"
+                value={project.settings?.speaker_name}
+                icon={User}
+              />
+              <ProfileField
+                label="Contact Email"
+                value={project.settings?.contact_email}
+                icon={Mail}
+              />
+            </div>
+          )}
           <p className="text-xs mt-4" style={{ color: 'rgb(var(--text-muted))' }}>
             Profile details are extracted from the Client Profile (WR1) during generation
           </p>
