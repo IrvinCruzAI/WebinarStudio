@@ -1,4 +1,4 @@
-import { DeliverableId } from '../contracts';
+import { DeliverableId, OperatorSettings } from '../contracts';
 
 export interface PromptContext {
   buildTranscript: string;
@@ -8,8 +8,35 @@ export interface PromptContext {
     cta_mode: string;
     audience_temperature: string;
     webinar_length_minutes: number;
+    operator?: OperatorSettings;
   };
   dependencies?: Record<string, unknown>;
+}
+
+function buildOperatorSettingsContext(operator?: OperatorSettings): string {
+  if (!operator) return '';
+
+  const parts: string[] = [];
+
+  if (operator.sender_name) {
+    parts.push(`- Sender name: ${operator.sender_name}`);
+  }
+  if (operator.sender_email) {
+    parts.push(`- Sender email: ${operator.sender_email}`);
+  }
+  if (operator.reply_to_email) {
+    parts.push(`- Reply-to email: ${operator.reply_to_email}`);
+  }
+  if (operator.primary_cta_link) {
+    parts.push(`- Primary CTA link: ${operator.primary_cta_link}`);
+  }
+  if (operator.registration_link) {
+    parts.push(`- Registration link: ${operator.registration_link}`);
+  }
+
+  if (parts.length === 0) return '';
+
+  return `\n\nOPERATOR-PROVIDED VALUES (use these exact values, do not create placeholders for them):\n${parts.join('\n')}\n`;
 }
 
 export function getConstraintSummary(deliverableId: DeliverableId): string {
@@ -247,7 +274,7 @@ ${JSON.stringify(ctx.dependencies?.WR1 || {}, null, 2).slice(0, 2000)}
 
 WR2 FRAMEWORK:
 ${JSON.stringify(ctx.dependencies?.WR2 || {}, null, 2).slice(0, 3000)}
-
+${buildOperatorSettingsContext(ctx.settings.operator)}
 Return JSON with EXACTLY this structure:
 {
   "hero_headline": "Compelling headline here",
@@ -294,7 +321,7 @@ CRITICAL:
 
 WR1 DATA:
 ${JSON.stringify(ctx.dependencies?.WR1 || {}, null, 2).slice(0, 2000)}
-
+${buildOperatorSettingsContext(ctx.settings.operator)}
 CRITICAL: email_id MUST use two-digit format with leading zero: E01, E02, E03, E04, E05, E06, E07, E08, E09, E10
 NOT: E1, E2, E3... - single digits will cause validation failure!
 

@@ -1,12 +1,29 @@
-import { ProjectMetadata, ProjectStatus, DeliverableId, CTA, AudienceTemperature } from '../contracts';
+import { ProjectMetadata, ProjectStatus, DeliverableId, CTA, AudienceTemperature, OperatorSettings } from '../contracts';
 
 const METADATA_KEY = 'wrv1_projects';
+
+function migrateProject(project: ProjectMetadata): ProjectMetadata {
+  if (!project.settings) {
+    project.settings = {
+      cta_mode: 'book_call',
+      audience_temperature: 'warm',
+      webinar_length_minutes: 60,
+    };
+  }
+
+  if (project.settings.operator === undefined) {
+    project.settings.operator = {};
+  }
+
+  return project;
+}
 
 export function loadMetadata(): ProjectMetadata[] {
   try {
     const stored = localStorage.getItem(METADATA_KEY);
     if (!stored) return [];
-    return JSON.parse(stored) as ProjectMetadata[];
+    const projects = JSON.parse(stored) as ProjectMetadata[];
+    return projects.map(migrateProject);
   } catch (error) {
     console.error('Failed to load metadata:', error);
     return [];
@@ -62,6 +79,7 @@ export function createProject(
     speaker_name?: string;
     company_name?: string;
     contact_email?: string;
+    operator?: OperatorSettings;
   }
 ): ProjectMetadata {
   const project: ProjectMetadata = {
@@ -71,7 +89,10 @@ export function createProject(
     status: 'review',
     created_at: Date.now(),
     updated_at: Date.now(),
-    settings,
+    settings: {
+      ...settings,
+      operator: settings.operator || {},
+    },
     deliverable_pointers: {},
   };
 
@@ -125,7 +146,35 @@ export function updateProjectSettings(
     speaker_name?: string;
     company_name?: string;
     contact_email?: string;
+    operator?: OperatorSettings;
   }>
+): void {
+  const project = getProject(projectId);
+  if (!project) {
+    throw new Error(`Project ${projectId} not found`);
+  }
+
+  const newSettings = { ...project.settings };
+
+  if (settingsUpdates.operator) {
+    newSettings.operator = {
+      ...project.settings.operator,
+      ...settingsUpdates.operator,
+    };
+    delete settingsUpdates.operator;
+  }
+
+  updateProject(projectId, {
+    settings: {
+      ...newSettings,
+      ...settingsUpdates,
+    },
+  });
+}
+
+export function updateOperatorSettings(
+  projectId: string,
+  operatorUpdates: Partial<OperatorSettings>
 ): void {
   const project = getProject(projectId);
   if (!project) {
@@ -135,7 +184,10 @@ export function updateProjectSettings(
   updateProject(projectId, {
     settings: {
       ...project.settings,
-      ...settingsUpdates,
+      operator: {
+        ...project.settings.operator,
+        ...operatorUpdates,
+      },
     },
   });
 }

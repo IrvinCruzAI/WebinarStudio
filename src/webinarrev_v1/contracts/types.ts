@@ -5,6 +5,14 @@ import {
   AudienceTemperature,
 } from './enums';
 
+export interface OperatorSettings {
+  sender_name?: string;
+  sender_email?: string;
+  reply_to_email?: string;
+  primary_cta_link?: string;
+  registration_link?: string;
+}
+
 export interface ProjectMetadata {
   project_id: string;
   run_id: string;
@@ -20,6 +28,7 @@ export interface ProjectMetadata {
     speaker_name?: string;
     company_name?: string;
     contact_email?: string;
+    operator?: OperatorSettings;
   };
   deliverable_pointers: {
     [key in DeliverableId]?: {

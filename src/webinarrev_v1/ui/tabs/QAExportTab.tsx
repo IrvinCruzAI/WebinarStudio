@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Download,
   Package,
@@ -14,6 +14,11 @@ import {
   Shield,
   Loader2,
   Edit3,
+  Settings,
+  Info,
+  ChevronDown,
+  ChevronRight,
+  Bug,
 } from 'lucide-react';
 import type { ProjectMetadata, DeliverableId } from '../../contracts';
 import { DELIVERABLES, UI_DELIVERABLE_ORDER } from '../../contracts/deliverables';
@@ -25,6 +30,15 @@ import {
   isValidIssue,
   type TranslatedIssue,
 } from '../../utils/translateIssue';
+import {
+  tagIssues,
+  groupIssuesBySource,
+  getSourceDisplayInfo,
+  type RawIssue,
+  type TaggedIssue,
+  type QASource,
+  type QASummary,
+} from '../../utils/qaSourceTagger';
 
 interface PlaceholderMatch {
   deliverableId: string;
@@ -120,6 +134,11 @@ export function QAExportTab({
   const [selectedExportType, setSelectedExportType] = useState<ExportType>('client');
   const [isExporting, setIsExporting] = useState(false);
   const [exportHistory, setExportHistory] = useState<Array<{ type: ExportType; timestamp: number }>>([]);
+  const [bugFilteredCount, setBugFilteredCount] = useState(0);
+  const [qaSummary, setQaSummary] = useState<QASummary | null>(null);
+  const [expandedSources, setExpandedSources] = useState<Set<QASource>>(
+    new Set(['SETTINGS_REQUIRED', 'INPUT_MISSING', 'MODEL_UNCERTAIN'])
+  );
 
   useEffect(() => {
     checkEligibility();
@@ -190,6 +209,38 @@ export function QAExportTab({
     setIssues(foundIssues);
     setPlaceholders(foundPlaceholders);
     setIsScanning(false);
+  };
+
+  const taggedResult = useMemo(() => {
+    const rawIssues: RawIssue[] = issues.map(issue => ({
+      type: issue.type,
+      severity: issue.severity,
+      deliverableId: issue.deliverableId,
+      message: issue.message,
+      fieldPath: issue.fieldPath,
+    }));
+    return tagIssues(rawIssues, project.settings);
+  }, [issues, project.settings]);
+
+  useEffect(() => {
+    setBugFilteredCount(taggedResult.bugFilteredCount);
+    setQaSummary(taggedResult.summary);
+  }, [taggedResult]);
+
+  const groupedBySource = useMemo(() => {
+    return groupIssuesBySource(taggedResult.taggedIssues);
+  }, [taggedResult.taggedIssues]);
+
+  const toggleSourceExpanded = (source: QASource) => {
+    setExpandedSources(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(source)) {
+        newSet.delete(source);
+      } else {
+        newSet.add(source);
+      }
+      return newSet;
+    });
   };
 
   const handleRescan = async () => {
@@ -279,92 +330,65 @@ export function QAExportTab({
         <ReadinessSection
           eligibility={eligibility}
           isChecking={isCheckingEligibility}
-          criticalCount={criticalCount}
-          warningCount={warningCount}
-          placeholderCount={validPlaceholders.length}
+          qaSummary={qaSummary}
+          bugFilteredCount={bugFilteredCount}
         />
 
-        <div
-          className="rounded-2xl overflow-hidden"
-          style={{
-            background: 'rgb(var(--surface-elevated))',
-            border: '1px solid rgb(var(--border-default))',
-          }}
-        >
+        {isScanning ? (
           <div
-            className="flex items-center gap-4 p-4 border-b"
-            style={{ borderColor: 'rgb(var(--border-default))' }}
+            className="p-8 text-center rounded-2xl"
+            style={{
+              background: 'rgb(var(--surface-elevated))',
+              border: '1px solid rgb(var(--border-default))',
+            }}
           >
-            <div className="relative flex-1">
-              <Search
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
-                style={{ color: 'rgb(var(--text-muted))' }}
-              />
-              <input
-                type="text"
-                placeholder="Search issues..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="input-field pl-10 py-2"
-              />
-            </div>
-            <div className="flex items-center gap-1">
-              {(['all', 'critical', 'warning'] as const).map(sev => (
-                <button
-                  key={sev}
-                  onClick={() => setFilterSeverity(sev)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                    filterSeverity === sev
-                      ? 'bg-[rgb(var(--accent-primary))] text-white'
-                      : 'text-[rgb(var(--text-muted))] hover:bg-[rgb(var(--surface-glass))]'
-                  }`}
-                >
-                  {sev === 'all' ? 'All' : sev === 'critical' ? 'Critical' : 'Warnings'}
-                </button>
-              ))}
-            </div>
+            <RefreshCw
+              className="w-8 h-8 mx-auto mb-3 animate-spin"
+              style={{ color: 'rgb(var(--accent-primary))' }}
+            />
+            <p style={{ color: 'rgb(var(--text-muted))' }}>Scanning for issues...</p>
           </div>
+        ) : taggedResult.taggedIssues.length === 0 ? (
+          <div
+            className="p-8 text-center rounded-2xl"
+            style={{
+              background: 'rgb(var(--surface-elevated))',
+              border: '1px solid rgb(var(--border-default))',
+            }}
+          >
+            <CheckCircle2
+              className="w-12 h-12 mx-auto mb-3"
+              style={{ color: 'rgb(var(--success))' }}
+            />
+            <p className="font-medium mb-1" style={{ color: 'rgb(var(--text-primary))' }}>
+              No issues found
+            </p>
+            <p className="text-sm" style={{ color: 'rgb(var(--text-muted))' }}>
+              All assets are ready for export
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {(['SETTINGS_REQUIRED', 'INPUT_MISSING', 'MODEL_UNCERTAIN'] as const).map(source => {
+              const sourceIssues = groupedBySource[source];
+              if (sourceIssues.length === 0) return null;
 
-          {isScanning ? (
-            <div className="p-8 text-center">
-              <RefreshCw
-                className="w-8 h-8 mx-auto mb-3 animate-spin"
-                style={{ color: 'rgb(var(--accent-primary))' }}
-              />
-              <p style={{ color: 'rgb(var(--text-muted))' }}>Scanning for issues...</p>
-            </div>
-          ) : filteredIssues.length === 0 ? (
-            <div className="p-8 text-center">
-              <CheckCircle2
-                className="w-12 h-12 mx-auto mb-3"
-                style={{ color: 'rgb(var(--success))' }}
-              />
-              <p className="font-medium mb-1" style={{ color: 'rgb(var(--text-primary))' }}>
-                No issues found
-              </p>
-              <p className="text-sm" style={{ color: 'rgb(var(--text-muted))' }}>
-                All assets are ready for export
-              </p>
-            </div>
-          ) : (
-            <div className="divide-y" style={{ borderColor: 'rgb(var(--border-subtle))' }}>
-              {Object.entries(groupedIssues).map(([deliverableId, deliverableIssues]) => (
-                <IssueGroup
-                  key={deliverableId}
-                  deliverableId={deliverableId as DeliverableId}
-                  issues={deliverableIssues}
+              return (
+                <SourceGroupSection
+                  key={source}
+                  source={source}
+                  issues={sourceIssues}
+                  expanded={expandedSources.has(source)}
+                  onToggle={() => toggleSourceExpanded(source)}
                   onNavigate={handleNavigateToFix}
                 />
-              ))}
-            </div>
-          )}
-        </div>
+              );
+            })}
 
-        {validPlaceholders.length > 0 && (
-          <PlaceholderManager
-            placeholders={validPlaceholders}
-            onNavigateToFix={handleNavigateToFix}
-          />
+            {bugFilteredCount > 0 && (
+              <BugAlertSection count={bugFilteredCount} />
+            )}
+          </div>
         )}
 
         <div className="grid grid-cols-2 gap-4">
@@ -424,15 +448,13 @@ export function QAExportTab({
 function ReadinessSection({
   eligibility,
   isChecking,
-  criticalCount,
-  warningCount,
-  placeholderCount,
+  qaSummary,
+  bugFilteredCount,
 }: {
   eligibility: ExportEligibility | null;
   isChecking: boolean;
-  criticalCount: number;
-  warningCount: number;
-  placeholderCount: number;
+  qaSummary: QASummary | null;
+  bugFilteredCount: number;
 }) {
   if (isChecking) {
     return (
@@ -446,6 +468,10 @@ function ReadinessSection({
 
   const score = eligibility?.readiness_score || 0;
   const isReady = eligibility?.canExport || false;
+
+  const settingsCount = qaSummary?.settings_required.count || 0;
+  const inputMissingCount = qaSummary?.input_missing.count || 0;
+  const toFillCount = qaSummary?.model_uncertain.count || 0;
 
   return (
     <div className="grid grid-cols-4 gap-4">
@@ -490,21 +516,21 @@ function ReadinessSection({
       </div>
 
       <SummaryCard
-        icon={XCircle}
-        label="Must Fix"
-        count={criticalCount}
-        color="error"
+        icon={Settings}
+        label="Settings Required"
+        count={settingsCount}
+        color="info"
       />
       <SummaryCard
         icon={AlertTriangle}
-        label="To Review"
-        count={warningCount}
+        label="Missing Inputs"
+        count={inputMissingCount}
         color="warning"
       />
       <SummaryCard
         icon={Edit3}
         label="To Fill In"
-        count={placeholderCount}
+        count={toFillCount}
         color="neutral"
       />
     </div>
@@ -520,12 +546,13 @@ function SummaryCard({
   icon: typeof XCircle;
   label: string;
   count: number;
-  color: 'error' | 'warning' | 'neutral';
+  color: 'error' | 'warning' | 'neutral' | 'info';
 }) {
   const colorStyles = {
     error: { bg: 'rgb(var(--error) / 0.1)', border: 'rgb(var(--error) / 0.2)', icon: 'rgb(var(--error))' },
     warning: { bg: 'rgb(var(--warning) / 0.1)', border: 'rgb(var(--warning) / 0.2)', icon: 'rgb(var(--warning))' },
     neutral: { bg: 'rgb(var(--surface-elevated))', border: 'rgb(var(--border-default))', icon: 'rgb(var(--text-muted))' },
+    info: { bg: 'rgb(var(--accent-primary) / 0.1)', border: 'rgb(var(--accent-primary) / 0.2)', icon: 'rgb(var(--accent-primary))' },
   };
 
   const styles = colorStyles[color];
@@ -627,6 +654,224 @@ function IssueGroup({
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function SourceGroupSection({
+  source,
+  issues,
+  expanded,
+  onToggle,
+  onNavigate,
+}: {
+  source: QASource;
+  issues: TaggedIssue[];
+  expanded: boolean;
+  onToggle: () => void;
+  onNavigate: (id: DeliverableId) => void;
+}) {
+  const displayInfo = getSourceDisplayInfo(source);
+
+  const colorStyles: Record<typeof displayInfo.colorKey, { bg: string; border: string; icon: string; headerBg: string }> = {
+    error: {
+      bg: 'rgb(var(--error) / 0.05)',
+      border: 'rgb(var(--error) / 0.2)',
+      icon: 'rgb(var(--error))',
+      headerBg: 'rgb(var(--error) / 0.1)',
+    },
+    warning: {
+      bg: 'rgb(var(--warning) / 0.05)',
+      border: 'rgb(var(--warning) / 0.2)',
+      icon: 'rgb(var(--warning))',
+      headerBg: 'rgb(var(--warning) / 0.1)',
+    },
+    info: {
+      bg: 'rgb(var(--accent-primary) / 0.05)',
+      border: 'rgb(var(--accent-primary) / 0.2)',
+      icon: 'rgb(var(--accent-primary))',
+      headerBg: 'rgb(var(--accent-primary) / 0.1)',
+    },
+    neutral: {
+      bg: 'rgb(var(--surface-elevated))',
+      border: 'rgb(var(--border-default))',
+      icon: 'rgb(var(--text-muted))',
+      headerBg: 'rgb(var(--surface-glass))',
+    },
+  };
+
+  const styles = colorStyles[displayInfo.colorKey];
+
+  const SourceIcon = source === 'SETTINGS_REQUIRED' ? Settings :
+                     source === 'INPUT_MISSING' ? AlertTriangle :
+                     source === 'MODEL_UNCERTAIN' ? Edit3 : Info;
+
+  const groupedByDeliverable = issues.reduce((acc, issue) => {
+    const key = issue.deliverableId;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(issue);
+    return acc;
+  }, {} as Record<DeliverableId, TaggedIssue[]>);
+
+  return (
+    <div
+      className="rounded-2xl overflow-hidden"
+      style={{
+        background: styles.bg,
+        border: `1px solid ${styles.border}`,
+      }}
+    >
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between p-4 transition-colors hover:opacity-90"
+        style={{ background: styles.headerBg }}
+      >
+        <div className="flex items-center gap-3">
+          <SourceIcon className="w-5 h-5" style={{ color: styles.icon }} />
+          <div className="text-left">
+            <span className="font-semibold" style={{ color: 'rgb(var(--text-primary))' }}>
+              {displayInfo.title}
+            </span>
+            <span
+              className="ml-2 text-xs px-2 py-0.5 rounded-full"
+              style={{ background: styles.border, color: 'rgb(var(--text-primary))' }}
+            >
+              {issues.length}
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+            {displayInfo.description}
+          </span>
+          {expanded ? (
+            <ChevronDown className="w-5 h-5" style={{ color: 'rgb(var(--text-muted))' }} />
+          ) : (
+            <ChevronRight className="w-5 h-5" style={{ color: 'rgb(var(--text-muted))' }} />
+          )}
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="p-4 space-y-4">
+          {Object.entries(groupedByDeliverable).map(([deliverableId, deliverableIssues]) => {
+            const assetName = getAssetName(deliverableId as DeliverableId);
+
+            return (
+              <div key={deliverableId}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-medium text-sm" style={{ color: 'rgb(var(--text-primary))' }}>
+                    {assetName}
+                  </span>
+                  <button
+                    onClick={() => onNavigate(deliverableId as DeliverableId)}
+                    className="btn-ghost text-xs"
+                    style={{ color: 'rgb(var(--accent-primary))' }}
+                  >
+                    Go to {assetName}
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {deliverableIssues.map((issue, i) => {
+                    const translated = translateIssue(issue.message, issue.deliverableId, issue.fieldPath);
+                    if (!translated.isValid) return null;
+
+                    return (
+                      <div
+                        key={i}
+                        className="flex items-start gap-3 p-3 rounded-lg"
+                        style={{ background: 'rgb(var(--surface-base))' }}
+                      >
+                        <SourceIcon className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: styles.icon }} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium" style={{ color: 'rgb(var(--text-primary))' }}>
+                              {translated.title}
+                            </p>
+                            {translated.severityHint === 'Must Fix' && (
+                              <span
+                                className="text-xs px-1.5 py-0.5 rounded"
+                                style={{
+                                  background: 'rgb(var(--error) / 0.1)',
+                                  color: 'rgb(var(--error))',
+                                }}
+                              >
+                                Must Fix
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs mt-0.5" style={{ color: 'rgb(var(--text-muted))' }}>
+                            {translated.oneSentenceFix || translated.description}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => onNavigate(deliverableId as DeliverableId)}
+                          className="flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
+                          style={{
+                            background: 'rgb(var(--accent-primary) / 0.1)',
+                            color: 'rgb(var(--accent-primary))',
+                          }}
+                        >
+                          {translated.actionLabel}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BugAlertSection({ count }: { count: number }) {
+  const [showDetails, setShowDetails] = useState(false);
+
+  return (
+    <div
+      className="p-4 rounded-xl"
+      style={{
+        background: 'rgb(var(--error) / 0.05)',
+        border: '1px solid rgb(var(--error) / 0.2)',
+      }}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Bug className="w-5 h-5" style={{ color: 'rgb(var(--error))' }} />
+          <div>
+            <p className="font-medium text-sm" style={{ color: 'rgb(var(--text-primary))' }}>
+              {count} technical issue{count !== 1 ? 's' : ''} filtered
+            </p>
+            <p className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+              These are internal errors that have been hidden from the main view
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => setShowDetails(!showDetails)}
+          className="btn-ghost text-xs"
+          style={{ color: 'rgb(var(--text-muted))' }}
+        >
+          {showDetails ? 'Hide' : 'Show'} in Debug Panel
+        </button>
+      </div>
+      {showDetails && (
+        <div
+          className="mt-3 p-3 rounded-lg text-xs font-mono"
+          style={{
+            background: 'rgb(var(--surface-base))',
+            color: 'rgb(var(--text-muted))',
+          }}
+        >
+          <p>Bug count: {count}</p>
+          <p className="mt-1">Check the Debug Panel for details on malformed paths or undefined references.</p>
+        </div>
+      )}
     </div>
   );
 }
