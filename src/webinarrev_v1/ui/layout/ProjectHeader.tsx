@@ -1,4 +1,4 @@
-import { ArrowLeft, Play, Building2, User, Clock, Target } from 'lucide-react';
+import { ArrowLeft, Play, Building2, User, Clock } from 'lucide-react';
 import type { ProjectMetadata } from '../../contracts';
 import type { PipelineProgress } from '../../pipeline/orchestrator';
 import PipelineProgressPanel from '../components/PipelineProgressPanel';
@@ -44,9 +44,6 @@ export function ProjectHeader({
   }
   if (project.settings?.webinar_length_minutes) {
     infoItems.push({ icon: Clock, label: `${project.settings.webinar_length_minutes} min` });
-  }
-  if (project.settings?.cta_mode) {
-    infoItems.push({ icon: Target, label: project.settings.cta_mode });
   }
 
   return (
