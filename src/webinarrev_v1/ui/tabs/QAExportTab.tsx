@@ -959,7 +959,7 @@ function PlaceholderManager({
 
               <div className="space-y-2">
                 {items.map((placeholder, i) => {
-                  const friendlyName = translatePlaceholder(placeholder.text);
+                  const friendlyName = translatePlaceholder(placeholder.text, placeholder.path);
                   return (
                     <div
                       key={i}

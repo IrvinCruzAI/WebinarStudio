@@ -196,26 +196,56 @@ export function getAssetName(deliverableId: DeliverableId): string {
   return meta?.short_title || meta?.title || deliverableId;
 }
 
-export function translatePlaceholder(placeholderText: string): string {
+export function translatePlaceholder(placeholderText: string, fieldPath?: string): string {
   const lowerText = placeholderText.toLowerCase();
 
   for (const [pattern, friendly] of Object.entries(PLACEHOLDER_FRIENDLY_NAMES)) {
-    if (lowerText.includes(pattern.toLowerCase())) {
+    if (pattern !== '_placeholder' && lowerText.includes(pattern.toLowerCase())) {
       return friendly;
+    }
+  }
+
+  if (fieldPath) {
+    const fieldName = extractFieldNameFromPath(fieldPath);
+    if (fieldName && fieldName !== 'placeholder') {
+      return fieldName;
+    }
+  }
+
+  if (placeholderText.endsWith('_placeholder')) {
+    const fieldPart = placeholderText.replace(/_placeholder$/, '');
+    if (fieldPart.length > 0) {
+      return formatFieldName(fieldPart);
     }
   }
 
   const cleanedText = placeholderText
     .replace(/\{\{|\}\}/g, '')
     .replace(/\[|\]/g, '')
+    .replace(/_placeholder$/i, '')
     .replace(/_/g, ' ')
     .trim();
 
-  if (cleanedText.length > 0 && cleanedText.length < 50) {
+  if (cleanedText.length > 0 && cleanedText.length < 50 && cleanedText !== 'placeholder') {
     return cleanedText.charAt(0).toUpperCase() + cleanedText.slice(1).toLowerCase();
   }
 
-  return 'Missing information';
+  return 'Content to fill in';
+}
+
+function extractFieldNameFromPath(path: string): string | null {
+  const parts = path.split('.');
+  const lastPart = parts[parts.length - 1];
+
+  const arrayMatch = lastPart?.match(/^(\w+)\[\d+\]$/);
+  const fieldName = arrayMatch ? arrayMatch[1] : lastPart;
+
+  if (!fieldName || fieldName === 'placeholder') return null;
+
+  const cleanedName = fieldName.replace(/_placeholder$/, '');
+  if (cleanedName.length === 0) return null;
+
+  return formatFieldName(cleanedName);
 }
 
 export function translateIssue(
@@ -278,7 +308,7 @@ export function translateIssue(
       }
     }
 
-    const friendlyName = translatePlaceholder(placeholderText);
+    const friendlyName = translatePlaceholder(placeholderText, fieldPath);
 
     return {
       title: `${friendlyName} is missing`,
