@@ -8,16 +8,23 @@ import {
   AlertTriangle,
   RefreshCw,
   Search,
-  ChevronRight,
   ArrowRight,
   Clock,
   Archive,
   Shield,
   Loader2,
+  Edit3,
 } from 'lucide-react';
 import type { ProjectMetadata, DeliverableId } from '../../contracts';
 import { DELIVERABLES, UI_DELIVERABLE_ORDER } from '../../contracts/deliverables';
 import { computeExportEligibility, type ExportEligibility } from '../../export/eligibilityComputer';
+import {
+  translateIssue,
+  translatePlaceholder,
+  getAssetName,
+  isValidIssue,
+  type TranslatedIssue,
+} from '../../utils/translateIssue';
 
 interface PlaceholderMatch {
   deliverableId: string;
@@ -211,20 +218,26 @@ export function QAExportTab({
     }
   };
 
-  const filteredIssues = issues.filter(issue => {
+  const validIssues = issues.filter(issue => isValidIssue(issue.message, issue.fieldPath));
+
+  const filteredIssues = validIssues.filter(issue => {
     if (filterSeverity !== 'all' && issue.severity !== filterSeverity) return false;
     if (searchQuery) {
       const searchLower = searchQuery.toLowerCase();
+      const translated = translateIssue(issue.message, issue.deliverableId, issue.fieldPath);
       return (
-        issue.message.toLowerCase().includes(searchLower) ||
+        translated.title.toLowerCase().includes(searchLower) ||
+        translated.description.toLowerCase().includes(searchLower) ||
         DELIVERABLES[issue.deliverableId].title.toLowerCase().includes(searchLower)
       );
     }
     return true;
   });
 
-  const criticalCount = issues.filter(i => i.severity === 'critical').length;
-  const warningCount = issues.filter(i => i.severity === 'warning').length;
+  const criticalCount = validIssues.filter(i => i.severity === 'critical').length;
+  const warningCount = validIssues.filter(i => i.severity === 'warning').length;
+
+  const validPlaceholders = placeholders.filter(p => !p.path.includes('undefined') && p.text.trim().length > 0);
 
   const groupedIssues = filteredIssues.reduce((acc, issue) => {
     const key = issue.deliverableId;
@@ -243,9 +256,15 @@ export function QAExportTab({
             <h2 className="text-xl font-bold" style={{ color: 'rgb(var(--text-primary))' }}>
               QA & Export
             </h2>
-            <p className="text-sm" style={{ color: 'rgb(var(--text-muted))' }}>
-              Review issues and export deliverables
-            </p>
+            {criticalCount + warningCount > 0 ? (
+              <p className="text-sm" style={{ color: 'rgb(var(--text-muted))' }}>
+                {criticalCount > 0 ? `${criticalCount} item${criticalCount !== 1 ? 's' : ''} need${criticalCount === 1 ? 's' : ''} your attention` : `${warningCount} item${warningCount !== 1 ? 's' : ''} to review`}
+              </p>
+            ) : (
+              <p className="text-sm" style={{ color: 'rgb(var(--success))' }}>
+                Ready to export
+              </p>
+            )}
           </div>
           <button
             onClick={handleRescan}
@@ -253,7 +272,7 @@ export function QAExportTab({
             className="btn-secondary text-sm"
           >
             <RefreshCw className={`w-4 h-4 ${isScanning ? 'animate-spin' : ''}`} />
-            Rescan All
+            Check Again
           </button>
         </div>
 
@@ -262,7 +281,7 @@ export function QAExportTab({
           isChecking={isCheckingEligibility}
           criticalCount={criticalCount}
           warningCount={warningCount}
-          placeholderCount={placeholders.length}
+          placeholderCount={validPlaceholders.length}
         />
 
         <div
@@ -341,9 +360,9 @@ export function QAExportTab({
           )}
         </div>
 
-        {placeholders.length > 0 && (
+        {validPlaceholders.length > 0 && (
           <PlaceholderManager
-            placeholders={placeholders}
+            placeholders={validPlaceholders}
             onNavigateToFix={handleNavigateToFix}
           />
         )}
@@ -472,19 +491,19 @@ function ReadinessSection({
 
       <SummaryCard
         icon={XCircle}
-        label="Critical Issues"
+        label="Must Fix"
         count={criticalCount}
         color="error"
       />
       <SummaryCard
         icon={AlertTriangle}
-        label="Warnings"
+        label="To Review"
         count={warningCount}
         color="warning"
       />
       <SummaryCard
-        icon={FileText}
-        label="Placeholders"
+        icon={Edit3}
+        label="To Fill In"
         count={placeholderCount}
         color="neutral"
       />
@@ -538,72 +557,76 @@ function IssueGroup({
   issues: Issue[];
   onNavigate: (id: DeliverableId) => void;
 }) {
-  const [expanded, setExpanded] = useState(true);
   const meta = DELIVERABLES[deliverableId];
   const criticalCount = issues.filter(i => i.severity === 'critical').length;
+  const assetName = meta.short_title || meta.title;
+
+  const translatedIssues = issues.map(issue => ({
+    ...issue,
+    translated: translateIssue(issue.message, issue.deliverableId, issue.fieldPath),
+  })).filter(issue => issue.translated.isValid);
+
+  if (translatedIssues.length === 0) return null;
 
   return (
-    <div>
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between p-4 hover:bg-[rgb(var(--surface-glass))] transition-colors"
-      >
-        <div className="flex items-center gap-3">
-          <ChevronRight
-            className={`w-4 h-4 transition-transform ${expanded ? 'rotate-90' : ''}`}
-            style={{ color: 'rgb(var(--text-muted))' }}
-          />
-          <span className="font-medium" style={{ color: 'rgb(var(--text-primary))' }}>
-            {meta.title}
-          </span>
-          <span className="badge badge-neutral text-xs">{meta.internal_badge}</span>
-        </div>
+    <div className="p-4">
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          {criticalCount > 0 && (
-            <span className="badge badge-error">{criticalCount} critical</span>
-          )}
-          <span className="text-sm" style={{ color: 'rgb(var(--text-muted))' }}>
-            {issues.length} issue{issues.length !== 1 ? 's' : ''}
+          <span className="font-medium" style={{ color: 'rgb(var(--text-primary))' }}>
+            {assetName}
           </span>
+          {criticalCount > 0 && (
+            <span className="text-xs px-2 py-0.5 rounded-full" style={{
+              background: 'rgb(var(--error) / 0.1)',
+              color: 'rgb(var(--error))'
+            }}>
+              {criticalCount} must fix
+            </span>
+          )}
         </div>
-      </button>
+        <button
+          onClick={() => onNavigate(deliverableId)}
+          className="btn-ghost text-xs"
+          style={{ color: 'rgb(var(--accent-primary))' }}
+        >
+          Go to {assetName}
+          <ArrowRight className="w-3 h-3" />
+        </button>
+      </div>
 
-      {expanded && (
-        <div className="pb-2">
-          {issues.map((issue, i) => (
-            <div
-              key={i}
-              className="flex items-center justify-between px-4 py-2 ml-8 mr-4 rounded-lg hover:bg-[rgb(var(--surface-glass))] transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                {issue.severity === 'critical' ? (
-                  <XCircle className="w-4 h-4" style={{ color: 'rgb(var(--error))' }} />
-                ) : (
-                  <AlertTriangle className="w-4 h-4" style={{ color: 'rgb(var(--warning))' }} />
-                )}
-                <div>
-                  <p className="text-sm" style={{ color: 'rgb(var(--text-secondary))' }}>
-                    {issue.message}
-                  </p>
-                  {issue.fieldPath && (
-                    <p className="text-xs font-mono" style={{ color: 'rgb(var(--text-muted))' }}>
-                      {issue.fieldPath}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <button
-                onClick={() => onNavigate(deliverableId)}
-                className="btn-ghost text-xs py-1"
-                style={{ color: 'rgb(var(--accent-primary))' }}
-              >
-                Fix
-                <ArrowRight className="w-3 h-3" />
-              </button>
+      <div className="space-y-2">
+        {translatedIssues.map((issue, i) => (
+          <div
+            key={i}
+            className="flex items-start gap-3 p-3 rounded-lg"
+            style={{ background: 'rgb(var(--surface-base))' }}
+          >
+            {issue.severity === 'critical' ? (
+              <XCircle className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'rgb(var(--error))' }} />
+            ) : (
+              <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'rgb(var(--warning))' }} />
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium" style={{ color: 'rgb(var(--text-primary))' }}>
+                {issue.translated.title}
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: 'rgb(var(--text-muted))' }}>
+                {issue.translated.description}
+              </p>
             </div>
-          ))}
-        </div>
-      )}
+            <button
+              onClick={() => onNavigate(deliverableId)}
+              className="flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
+              style={{
+                background: 'rgb(var(--accent-primary) / 0.1)',
+                color: 'rgb(var(--accent-primary))'
+              }}
+            >
+              {issue.translated.actionLabel}
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -618,6 +641,13 @@ function PlaceholderManager({
   const [showCriticalOnly, setShowCriticalOnly] = useState(false);
   const filtered = showCriticalOnly ? placeholders.filter(p => p.critical) : placeholders;
 
+  const groupedByAsset = filtered.reduce((acc, p) => {
+    const key = p.deliverableId;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(p);
+    return acc;
+  }, {} as Record<string, PlaceholderMatch[]>);
+
   return (
     <div
       className="rounded-2xl overflow-hidden"
@@ -630,9 +660,14 @@ function PlaceholderManager({
         className="flex items-center justify-between p-4 border-b"
         style={{ borderColor: 'rgb(var(--border-default))' }}
       >
-        <h3 className="font-semibold" style={{ color: 'rgb(var(--text-primary))' }}>
-          Placeholder Manager
-        </h3>
+        <div>
+          <h3 className="font-semibold" style={{ color: 'rgb(var(--text-primary))' }}>
+            Content to Fill In
+          </h3>
+          <p className="text-xs mt-0.5" style={{ color: 'rgb(var(--text-muted))' }}>
+            These items need your input before export
+          </p>
+        </div>
         <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"
@@ -641,61 +676,85 @@ function PlaceholderManager({
             className="rounded"
           />
           <span className="text-sm" style={{ color: 'rgb(var(--text-secondary))' }}>
-            Critical only
+            Must fix only
           </span>
         </label>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr style={{ background: 'rgb(var(--surface-base))' }}>
-              <th className="text-left px-4 py-3 font-medium" style={{ color: 'rgb(var(--text-muted))' }}>
-                Asset
-              </th>
-              <th className="text-left px-4 py-3 font-medium" style={{ color: 'rgb(var(--text-muted))' }}>
-                Path
-              </th>
-              <th className="text-left px-4 py-3 font-medium" style={{ color: 'rgb(var(--text-muted))' }}>
-                Placeholder
-              </th>
-              <th className="text-left px-4 py-3 font-medium" style={{ color: 'rgb(var(--text-muted))' }}>
-                Severity
-              </th>
-              <th className="w-20" />
-            </tr>
-          </thead>
-          <tbody className="divide-y" style={{ borderColor: 'rgb(var(--border-subtle))' }}>
-            {filtered.map((placeholder, i) => (
-              <tr key={i} className="hover:bg-[rgb(var(--surface-glass))]">
-                <td className="px-4 py-3" style={{ color: 'rgb(var(--text-primary))' }}>
-                  {DELIVERABLES[placeholder.deliverableId as DeliverableId]?.short_title || placeholder.deliverableId}
-                </td>
-                <td className="px-4 py-3 font-mono text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
-                  {placeholder.path}
-                </td>
-                <td className="px-4 py-3" style={{ color: 'rgb(var(--text-secondary))' }}>
-                  {placeholder.text}
-                </td>
-                <td className="px-4 py-3">
-                  {placeholder.critical ? (
-                    <span className="badge badge-error">Critical</span>
-                  ) : (
-                    <span className="badge badge-warning">Warning</span>
+      <div className="p-4 space-y-4">
+        {Object.entries(groupedByAsset).map(([deliverableId, items]) => {
+          const assetName = getAssetName(deliverableId as DeliverableId);
+          const criticalCount = items.filter(i => i.critical).length;
+
+          return (
+            <div key={deliverableId}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-sm" style={{ color: 'rgb(var(--text-primary))' }}>
+                    {assetName}
+                  </span>
+                  {criticalCount > 0 && (
+                    <span className="text-xs px-2 py-0.5 rounded-full" style={{
+                      background: 'rgb(var(--error) / 0.1)',
+                      color: 'rgb(var(--error))'
+                    }}>
+                      {criticalCount} required
+                    </span>
                   )}
-                </td>
-                <td className="px-4 py-3">
-                  <button
-                    onClick={() => onNavigateToFix(placeholder.deliverableId as DeliverableId)}
-                    className="btn-ghost text-xs py-1"
-                  >
-                    Fix
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </div>
+                <button
+                  onClick={() => onNavigateToFix(deliverableId as DeliverableId)}
+                  className="btn-ghost text-xs"
+                  style={{ color: 'rgb(var(--accent-primary))' }}
+                >
+                  Go to {assetName}
+                  <ArrowRight className="w-3 h-3" />
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {items.map((placeholder, i) => {
+                  const friendlyName = translatePlaceholder(placeholder.text);
+                  return (
+                    <div
+                      key={i}
+                      className="flex items-center justify-between p-3 rounded-lg"
+                      style={{ background: 'rgb(var(--surface-base))' }}
+                    >
+                      <div className="flex items-center gap-3">
+                        {placeholder.critical ? (
+                          <XCircle className="w-4 h-4 flex-shrink-0" style={{ color: 'rgb(var(--error))' }} />
+                        ) : (
+                          <Edit3 className="w-4 h-4 flex-shrink-0" style={{ color: 'rgb(var(--warning))' }} />
+                        )}
+                        <div>
+                          <p className="text-sm" style={{ color: 'rgb(var(--text-primary))' }}>
+                            {friendlyName}
+                          </p>
+                          {placeholder.critical && (
+                            <p className="text-xs" style={{ color: 'rgb(var(--error))' }}>
+                              Required for export
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => onNavigateToFix(deliverableId as DeliverableId)}
+                        className="flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors"
+                        style={{
+                          background: 'rgb(var(--accent-primary) / 0.1)',
+                          color: 'rgb(var(--accent-primary))'
+                        }}
+                      >
+                        Fill in
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
