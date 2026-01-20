@@ -204,14 +204,18 @@ export default function ProjectList({
                     </div>
                   </div>
 
-                  <div className="h-4 w-px bg-slate-700" />
+                  {(project.settings.client_name || project.settings.company_name) && (
+                    <>
+                      <div className="h-4 w-px bg-slate-700" />
 
-                  <div className="flex items-center gap-2 text-slate-400">
-                    <span>CTA:</span>
-                    <span className="text-slate-300 capitalize">
-                      {project.settings.cta_mode.replace('_', ' ')}
-                    </span>
-                  </div>
+                      <div className="flex items-center gap-2 text-slate-400">
+                        <span>Client:</span>
+                        <span className="text-slate-300">
+                          {project.settings.client_name || project.settings.company_name}
+                        </span>
+                      </div>
+                    </>
+                  )}
 
                   <div className="h-4 w-px bg-slate-700" />
 
