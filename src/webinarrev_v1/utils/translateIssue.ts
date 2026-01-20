@@ -25,33 +25,6 @@ interface FieldLabelEntry {
 }
 
 const FIELD_LABEL_MAP: Record<string, FieldLabelEntry> = {
-  from_name_placeholder: {
-    label: 'Sender Name',
-    why: 'Appears in email headers',
-    actionText: 'Add in Settings',
-    route: { tab: 'setup' },
-    severityHint: 'Must Fix',
-    oneSentenceFix: 'Enter the name that should appear as the email sender',
-    usedBy: ['WR4 Emails'],
-  },
-  from_email_placeholder: {
-    label: 'Sender Email',
-    why: 'Required for email delivery',
-    actionText: 'Add in Settings',
-    route: { tab: 'setup' },
-    severityHint: 'Must Fix',
-    oneSentenceFix: 'Enter the email address to send from',
-    usedBy: ['WR4 Emails'],
-  },
-  reply_to_placeholder: {
-    label: 'Reply-To Email',
-    why: 'Where replies go when recipients respond',
-    actionText: 'Add in Settings',
-    route: { tab: 'setup' },
-    severityHint: 'Must Fix',
-    oneSentenceFix: 'Enter the email address for receiving replies',
-    usedBy: ['WR4 Emails'],
-  },
   link_placeholder: {
     label: 'CTA Link',
     why: 'Button destination for signups',
@@ -59,7 +32,7 @@ const FIELD_LABEL_MAP: Record<string, FieldLabelEntry> = {
     route: { tab: 'setup' },
     severityHint: 'Must Fix',
     oneSentenceFix: 'Paste the URL where the CTA button should link',
-    usedBy: ['WR3 Landing Page', 'WR4 Emails', 'WR6 Run of Show'],
+    usedBy: ['WR3 Landing Page', 'WR6 Run of Show'],
   },
   primary_cta_link_placeholder: {
     label: 'Primary CTA Link',
@@ -68,7 +41,7 @@ const FIELD_LABEL_MAP: Record<string, FieldLabelEntry> = {
     route: { tab: 'setup' },
     severityHint: 'Must Fix',
     oneSentenceFix: 'Paste the URL where the main CTA button should link',
-    usedBy: ['WR3 Landing Page', 'WR4 Emails'],
+    usedBy: ['WR3 Landing Page'],
   },
   registration_link_placeholder: {
     label: 'Registration Link',
@@ -77,7 +50,7 @@ const FIELD_LABEL_MAP: Record<string, FieldLabelEntry> = {
     route: { tab: 'setup' },
     severityHint: 'Must Fix',
     oneSentenceFix: 'Paste the webinar registration page URL',
-    usedBy: ['WR3 Landing Page', 'WR4 Emails'],
+    usedBy: ['WR3 Landing Page'],
   },
   client_name: {
     label: 'Client Name',
@@ -113,7 +86,7 @@ const FIELD_LABEL_MAP: Record<string, FieldLabelEntry> = {
     route: { tab: 'setup' },
     severityHint: 'Must Fix',
     oneSentenceFix: 'Set the webinar date in project settings',
-    usedBy: ['WR3 Landing Page', 'WR4 Emails'],
+    usedBy: ['WR3 Landing Page'],
   },
   webinar_time: {
     label: 'Webinar Time',
@@ -122,7 +95,7 @@ const FIELD_LABEL_MAP: Record<string, FieldLabelEntry> = {
     route: { tab: 'setup' },
     severityHint: 'Must Fix',
     oneSentenceFix: 'Set the webinar time in project settings',
-    usedBy: ['WR3 Landing Page', 'WR4 Emails'],
+    usedBy: ['WR3 Landing Page'],
   },
 };
 
@@ -137,9 +110,6 @@ const PLACEHOLDER_FRIENDLY_NAMES: Record<string, string> = {
   '{{OFFER_PRICE}}': 'Offer price',
   '{{BOOKING_LINK}}': 'Booking link',
   'link_placeholder': 'A link',
-  'from_email_placeholder': 'Sender email address',
-  'from_name_placeholder': 'Sender name',
-  'reply_to_placeholder': 'Reply-to email',
   '[TBD]': 'Content to be determined',
   '[TODO]': 'Content to complete',
   '[INSERT': 'Content to insert',
@@ -152,14 +122,8 @@ const PLACEHOLDER_FRIENDLY_NAMES: Record<string, string> = {
 };
 
 const OPERATOR_FIELD_PATTERNS: RegExp[] = [
-  /\.send_rules\.from_(name|email)_placeholder$/,
-  /\.send_rules\.reply_to_placeholder$/,
   /\.cta_block\.link_placeholder$/,
-  /primary_cta_link_placeholder$/,
   /registration_link_placeholder$/,
-  /from_name_placeholder$/,
-  /from_email_placeholder$/,
-  /reply_to_placeholder$/,
   /link_placeholder$/,
 ];
 

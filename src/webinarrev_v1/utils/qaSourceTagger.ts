@@ -23,14 +23,8 @@ export interface QASummary {
 }
 
 const OPERATOR_FIELD_PATTERNS: RegExp[] = [
-  /\.send_rules\.from_(name|email)_placeholder$/,
-  /\.send_rules\.reply_to_placeholder$/,
   /\.cta_block\.link_placeholder$/,
-  /primary_cta_link_placeholder$/,
   /registration_link_placeholder$/,
-  /from_name_placeholder$/,
-  /from_email_placeholder$/,
-  /reply_to_placeholder$/,
   /link_placeholder$/,
 ];
 

@@ -44,9 +44,8 @@ const ALLOWED_FIELDS: Record<string, Record<string, string[]>> = {
     qa: ['assumptions', 'placeholders', 'claims_requiring_proof'],
   },
   WR4: {
-    _root: ['send_rules', 'emails', 'qa'],
-    send_rules: ['from_name_placeholder', 'from_email_placeholder', 'reply_to_placeholder'],
-    'emails[]': ['email_id', 'timing', 'subject', 'preview_text', 'body_markdown', 'primary_cta_label', 'primary_cta_link_placeholder'],
+    _root: ['emails', 'qa'],
+    'emails[]': ['email_id', 'timing', 'subject', 'preview_text', 'body_markdown', 'primary_cta_label'],
     qa: ['assumptions', 'placeholders', 'claims_requiring_proof'],
   },
   WR5: {
@@ -362,15 +361,6 @@ function canonicalizeWR4(content: unknown, changes: NormalizationChange[]): unkn
   const obj = content as Record<string, unknown>;
 
   let result = stripUnknownFields(obj, ALLOWED_FIELDS.WR4._root, '', changes);
-
-  if (result.send_rules && typeof result.send_rules === 'object') {
-    result.send_rules = stripUnknownFields(
-      result.send_rules as Record<string, unknown>,
-      ALLOWED_FIELDS.WR4.send_rules,
-      'send_rules',
-      changes
-    );
-  }
 
   if (Array.isArray(result.emails)) {
     result.emails = result.emails.map((email: unknown, idx: number) => {

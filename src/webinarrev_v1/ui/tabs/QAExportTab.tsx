@@ -64,9 +64,6 @@ function scanForPlaceholders(content: unknown): PlaceholderMatch[] {
 
   const criticalPatterns = [
     'link_placeholder',
-    'from_email_placeholder',
-    'from_name_placeholder',
-    'reply_to_placeholder',
   ];
 
   function scan(obj: unknown, path: string) {
