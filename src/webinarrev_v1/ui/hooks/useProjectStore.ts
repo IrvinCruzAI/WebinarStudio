@@ -530,6 +530,13 @@ export function useProjectStore() {
     speaker_name?: string;
     company_name?: string;
     contact_email?: string;
+    operator?: {
+      sender_name?: string;
+      sender_email?: string;
+      reply_to_email?: string;
+      primary_cta_link?: string;
+      registration_link?: string;
+    };
   }>) => {
     if (!state.selectedProjectId) return;
 

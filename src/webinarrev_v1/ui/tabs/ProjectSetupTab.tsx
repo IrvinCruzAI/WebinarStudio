@@ -21,6 +21,8 @@ import {
   Check,
   Thermometer,
   X,
+  Link,
+  Send,
 } from 'lucide-react';
 import type { CTA, AudienceTemperature } from '../../contracts';
 import type { ProjectMetadata, DeliverableId, WR1 } from '../../contracts';
@@ -81,6 +83,12 @@ export function ProjectSetupTab({
   const [editedSpeakerName, setEditedSpeakerName] = useState(project.settings?.speaker_name || '');
   const [editedCompanyName, setEditedCompanyName] = useState(project.settings?.company_name || '');
   const [editedContactEmail, setEditedContactEmail] = useState(project.settings?.contact_email || '');
+  const [isEditingUrls, setIsEditingUrls] = useState(false);
+  const [editedRegistrationLink, setEditedRegistrationLink] = useState(project.settings?.operator?.registration_link || '');
+  const [editedPrimaryCtaLink, setEditedPrimaryCtaLink] = useState(project.settings?.operator?.primary_cta_link || '');
+  const [editedSenderName, setEditedSenderName] = useState(project.settings?.operator?.sender_name || '');
+  const [editedSenderEmail, setEditedSenderEmail] = useState(project.settings?.operator?.sender_email || '');
+  const [editedReplyToEmail, setEditedReplyToEmail] = useState(project.settings?.operator?.reply_to_email || '');
 
   useEffect(() => {
     loadTranscripts();
@@ -97,6 +105,12 @@ export function ProjectSetupTab({
     setEditedCompanyName(project.settings?.company_name || '');
     setEditedContactEmail(project.settings?.contact_email || '');
     setIsEditingProfile(false);
+    setEditedRegistrationLink(project.settings?.operator?.registration_link || '');
+    setEditedPrimaryCtaLink(project.settings?.operator?.primary_cta_link || '');
+    setEditedSenderName(project.settings?.operator?.sender_name || '');
+    setEditedSenderEmail(project.settings?.operator?.sender_email || '');
+    setEditedReplyToEmail(project.settings?.operator?.reply_to_email || '');
+    setIsEditingUrls(false);
   }, [project.project_id, project.settings]);
 
   const handleSaveConfig = () => {
@@ -140,6 +154,32 @@ export function ProjectSetupTab({
     setEditedCompanyName(project.settings?.company_name || '');
     setEditedContactEmail(project.settings?.contact_email || '');
     setIsEditingProfile(false);
+  };
+
+  const handleSaveUrls = () => {
+    if (onSettingsChange) {
+      const currentOperator = project.settings?.operator || {};
+      onSettingsChange({
+        operator: {
+          ...currentOperator,
+          registration_link: editedRegistrationLink.trim() || undefined,
+          primary_cta_link: editedPrimaryCtaLink.trim() || undefined,
+          sender_name: editedSenderName.trim() || undefined,
+          sender_email: editedSenderEmail.trim() || undefined,
+          reply_to_email: editedReplyToEmail.trim() || undefined,
+        },
+      });
+    }
+    setIsEditingUrls(false);
+  };
+
+  const handleCancelUrlsEdit = () => {
+    setEditedRegistrationLink(project.settings?.operator?.registration_link || '');
+    setEditedPrimaryCtaLink(project.settings?.operator?.primary_cta_link || '');
+    setEditedSenderName(project.settings?.operator?.sender_name || '');
+    setEditedSenderEmail(project.settings?.operator?.sender_email || '');
+    setEditedReplyToEmail(project.settings?.operator?.reply_to_email || '');
+    setIsEditingUrls(false);
   };
 
   const loadTranscripts = async () => {
@@ -505,6 +545,147 @@ export function ProjectSetupTab({
               />
             </div>
           )}
+        </SetupSection>
+
+        <SetupSection
+          id="links"
+          title="Links & Email Settings"
+          icon={Link}
+          expanded={expandedSections.has('links')}
+          onToggle={() => toggleSection('links')}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+              {isEditingUrls ? 'Edit links and email settings' : 'Configure URLs and sender information for generated content'}
+            </span>
+            <div className="flex items-center gap-2">
+              {isEditingUrls ? (
+                <>
+                  <button onClick={handleCancelUrlsEdit} className="btn-ghost text-xs">
+                    <X className="w-3.5 h-3.5" />
+                    Cancel
+                  </button>
+                  <button onClick={handleSaveUrls} className="btn-primary text-xs">
+                    <Check className="w-3.5 h-3.5" />
+                    Save
+                  </button>
+                </>
+              ) : (
+                <button onClick={() => setIsEditingUrls(true)} className="btn-secondary text-xs">
+                  <Edit3 className="w-3.5 h-3.5" />
+                  Edit
+                </button>
+              )}
+            </div>
+          </div>
+          {isEditingUrls ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 mb-2" style={{ color: 'rgb(var(--text-muted))' }}>
+                    <Link className="w-3.5 h-3.5" />
+                    Registration Link
+                  </label>
+                  <input
+                    type="url"
+                    value={editedRegistrationLink}
+                    onChange={e => setEditedRegistrationLink(e.target.value)}
+                    className="input-field text-sm"
+                    placeholder="https://example.com/register"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 mb-2" style={{ color: 'rgb(var(--text-muted))' }}>
+                    <Target className="w-3.5 h-3.5" />
+                    Primary CTA Link
+                  </label>
+                  <input
+                    type="url"
+                    value={editedPrimaryCtaLink}
+                    onChange={e => setEditedPrimaryCtaLink(e.target.value)}
+                    className="input-field text-sm"
+                    placeholder="https://example.com/cta"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 mb-2" style={{ color: 'rgb(var(--text-muted))' }}>
+                    <User className="w-3.5 h-3.5" />
+                    Sender Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editedSenderName}
+                    onChange={e => setEditedSenderName(e.target.value)}
+                    className="input-field text-sm"
+                    placeholder="John Doe"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 mb-2" style={{ color: 'rgb(var(--text-muted))' }}>
+                    <Send className="w-3.5 h-3.5" />
+                    Sender Email
+                  </label>
+                  <input
+                    type="email"
+                    value={editedSenderEmail}
+                    onChange={e => setEditedSenderEmail(e.target.value)}
+                    className="input-field text-sm"
+                    placeholder="sender@example.com"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 mb-2" style={{ color: 'rgb(var(--text-muted))' }}>
+                    <Mail className="w-3.5 h-3.5" />
+                    Reply-To Email
+                  </label>
+                  <input
+                    type="email"
+                    value={editedReplyToEmail}
+                    onChange={e => setEditedReplyToEmail(e.target.value)}
+                    className="input-field text-sm"
+                    placeholder="reply@example.com"
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-4">
+                <ProfileField
+                  label="Registration Link"
+                  value={project.settings?.operator?.registration_link}
+                  icon={Link}
+                />
+                <ProfileField
+                  label="Primary CTA Link"
+                  value={project.settings?.operator?.primary_cta_link}
+                  icon={Target}
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <ProfileField
+                  label="Sender Name"
+                  value={project.settings?.operator?.sender_name}
+                  icon={User}
+                />
+                <ProfileField
+                  label="Sender Email"
+                  value={project.settings?.operator?.sender_email}
+                  icon={Send}
+                />
+                <ProfileField
+                  label="Reply-To Email"
+                  value={project.settings?.operator?.reply_to_email}
+                  icon={Mail}
+                />
+              </div>
+            </div>
+          )}
+          <p className="text-xs mt-4" style={{ color: 'rgb(var(--text-muted))' }}>
+            These settings are used in generated landing pages, email campaigns, and CTAs
+          </p>
         </SetupSection>
 
         <SetupSection
