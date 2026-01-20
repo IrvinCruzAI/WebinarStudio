@@ -7,6 +7,7 @@ import {
   ChevronDown,
   MessageSquare,
   Shield,
+  RefreshCw,
 } from 'lucide-react';
 import type { ProjectMetadata, DeliverableId, WR2, WR2Block, BlockId, BlockPhase, WR6 } from '../../contracts';
 import { PHASE_MAPPING } from '../../contracts/enums';
@@ -24,6 +25,7 @@ interface FrameworkBuilderTabProps {
   isPipelineRunning: boolean;
   onRunPipeline: () => void;
   onEditDeliverable: (id: DeliverableId, field: string, value: unknown) => Promise<void>;
+  onRegenerate?: (id: DeliverableId, cascade: boolean) => Promise<void>;
 }
 
 export function FrameworkBuilderTab({
@@ -32,9 +34,12 @@ export function FrameworkBuilderTab({
   isPipelineRunning,
   onRunPipeline,
   onEditDeliverable,
+  onRegenerate,
 }: FrameworkBuilderTabProps) {
   const [selectedBlockIndex, setSelectedBlockIndex] = useState<number | null>(null);
   const [jumpToBlock, setJumpToBlock] = useState<string>('');
+  const [showRegenerateMenu, setShowRegenerateMenu] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
   const wr2Artifact = artifacts.get('WR2');
   const wr1Artifact = artifacts.get('WR1');
@@ -95,6 +100,17 @@ export function FrameworkBuilderTab({
     await onEditDeliverable('WR2', `blocks[${selectedBlockIndex}]`, updatedBlock);
   };
 
+  const handleRegenerate = async (cascade: boolean) => {
+    if (!onRegenerate) return;
+    setIsRegenerating(true);
+    setShowRegenerateMenu(false);
+    try {
+      await onRegenerate('WR2', cascade);
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
   if (!wr2) {
     return (
       <div className="flex-1 overflow-auto p-6">
@@ -150,6 +166,52 @@ export function FrameworkBuilderTab({
               </p>
             </div>
             <div className="flex items-center gap-3">
+              {onRegenerate && (
+                <div className="relative">
+                  <button
+                    onClick={() => setShowRegenerateMenu(!showRegenerateMenu)}
+                    disabled={isRegenerating || isPipelineRunning}
+                    className="btn-secondary text-sm"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${isRegenerating ? 'animate-spin' : ''}`} />
+                    Regenerate
+                    <ChevronDown className="w-3 h-3 ml-1" />
+                  </button>
+                  {showRegenerateMenu && (
+                    <div
+                      className="absolute right-0 mt-1 w-64 rounded-lg shadow-lg overflow-hidden z-10"
+                      style={{
+                        background: 'rgb(var(--surface-elevated))',
+                        border: '1px solid rgb(var(--border-default))',
+                      }}
+                    >
+                      <button
+                        onClick={() => handleRegenerate(false)}
+                        className="w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[rgb(var(--surface-glass))]"
+                        style={{
+                          color: 'rgb(var(--text-primary))',
+                          borderBottom: '1px solid rgb(var(--border-default))',
+                        }}
+                      >
+                        <div className="font-medium">Regenerate Framework Only</div>
+                        <div className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+                          Only regenerate WR2, keep assets unchanged
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => handleRegenerate(true)}
+                        className="w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[rgb(var(--surface-glass))]"
+                        style={{ color: 'rgb(var(--text-primary))' }}
+                      >
+                        <div className="font-medium">Regenerate Framework + All Assets</div>
+                        <div className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+                          Regenerate WR2 and all downstream deliverables (WR3-WR9)
+                        </div>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="relative">
                 <select
                   value={jumpToBlock}

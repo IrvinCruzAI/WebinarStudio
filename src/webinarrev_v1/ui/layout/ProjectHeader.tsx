@@ -1,14 +1,15 @@
-import { ArrowLeft, Play, Loader2, Wrench, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import type { ProjectMetadata, DeliverableId } from '../../contracts';
-import { DELIVERABLES } from '../../contracts/deliverables';
+import { ArrowLeft, Play } from 'lucide-react';
+import type { ProjectMetadata } from '../../contracts';
 import type { PipelineProgress } from '../../pipeline/orchestrator';
+import PipelineProgressPanel from '../components/PipelineProgressPanel';
 
 interface ProjectHeaderProps {
   project: ProjectMetadata;
   isPipelineRunning: boolean;
-  pipelineProgress: PipelineProgress | null;
+  pipelineProgress: PipelineProgress[];
   onBack: () => void;
   onRunPipeline: () => void;
+  onCancelPipeline: () => void;
   activeTab: string;
   onTabChange: (tab: string) => void;
 }
@@ -26,9 +27,12 @@ export function ProjectHeader({
   pipelineProgress,
   onBack,
   onRunPipeline,
+  onCancelPipeline,
   activeTab,
   onTabChange,
 }: ProjectHeaderProps) {
+  const hasErrors = pipelineProgress.some(p => p.status === 'error');
+
   return (
     <header
       className="border-b flex-shrink-0"
@@ -51,22 +55,12 @@ export function ProjectHeader({
             </h1>
             <div className="flex items-center gap-2 mt-0.5">
               <StatusBadge status={project.status} />
-              {isPipelineRunning && pipelineProgress && (
-                <span
-                  className="text-xs"
-                  style={{ color: 'rgb(var(--text-muted))' }}
-                >
-                  {getStageLabel(pipelineProgress.deliverableId, pipelineProgress.status)}
-                </span>
-              )}
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          {isPipelineRunning && pipelineProgress ? (
-            <PipelineProgressDisplay progress={pipelineProgress} />
-          ) : (
+          {!isPipelineRunning && pipelineProgress.length === 0 && (
             <button
               onClick={onRunPipeline}
               className="btn-primary text-sm"
@@ -78,6 +72,17 @@ export function ProjectHeader({
           )}
         </div>
       </div>
+
+      {(isPipelineRunning || pipelineProgress.length > 0) && (
+        <div className="px-6 pb-4">
+          <PipelineProgressPanel
+            progress={pipelineProgress}
+            isRunning={isPipelineRunning}
+            onCancel={onCancelPipeline}
+            hasErrors={hasErrors}
+          />
+        </div>
+      )}
 
       <div className="px-6">
         <nav className="flex gap-1">
@@ -122,94 +127,4 @@ function StatusBadge({ status }: { status: ProjectMetadata['status'] }) {
   const { class: className, label } = config[status] || config.draft;
 
   return <span className={`badge ${className}`}>{label}</span>;
-}
-
-function ProgressBar({ progress }: { progress: number }) {
-  return (
-    <div
-      className="w-32 h-2 rounded-full overflow-hidden"
-      style={{ background: 'rgb(var(--surface-base))' }}
-    >
-      <div
-        className="h-full rounded-full transition-all duration-300"
-        style={{
-          width: `${Math.min(100, Math.max(0, progress))}%`,
-          background: 'linear-gradient(90deg, rgb(var(--accent-primary)), rgb(var(--accent-secondary)))',
-        }}
-      />
-    </div>
-  );
-}
-
-function getStageLabel(deliverableId: DeliverableId, status: string): string {
-  const meta = DELIVERABLES[deliverableId];
-  const statusLabels: Record<string, string> = {
-    generating: 'Generating',
-    validating: 'Validating',
-    repairing: 'Repairing',
-    complete: 'Complete',
-    error: 'Error',
-  };
-  const statusLabel = statusLabels[status] || '';
-  return statusLabel ? `${statusLabel} ${meta?.short_title || deliverableId}` : meta?.short_title || deliverableId;
-}
-
-const TOTAL_PIPELINE_STAGES = 10;
-
-function PipelineProgressDisplay({ progress }: { progress: PipelineProgress }) {
-  const meta = DELIVERABLES[progress.deliverableId];
-  const stageName = meta?.short_title || progress.deliverableId;
-  const stageIndex = Object.keys(DELIVERABLES).indexOf(progress.deliverableId);
-  const progressPercent = Math.round(((stageIndex + 1) / TOTAL_PIPELINE_STAGES) * 100);
-
-  const statusConfig: Record<string, { label: string; color: string; icon: typeof Loader2 }> = {
-    pending: { label: 'Queued', color: 'rgb(var(--text-muted))', icon: Loader2 },
-    generating: { label: 'Generating', color: 'rgb(var(--accent-primary))', icon: Loader2 },
-    repairing: { label: 'Repairing', color: 'rgb(var(--warning))', icon: Wrench },
-    validating: { label: 'Validating', color: 'rgb(var(--accent-secondary))', icon: Loader2 },
-    complete: { label: 'Complete', color: 'rgb(var(--success))', icon: CheckCircle2 },
-    error: { label: 'Error', color: 'rgb(var(--error))', icon: AlertTriangle },
-  };
-
-  const config = statusConfig[progress.status] || statusConfig.pending;
-  const Icon = config.icon;
-
-  const isAnimated = progress.status === 'generating' || progress.status === 'validating' || progress.status === 'repairing';
-
-  return (
-    <div
-      className="flex items-center gap-4 px-4 py-2 rounded-xl"
-      style={{
-        background: 'rgb(var(--surface-base))',
-        border: '1px solid rgb(var(--border-default))',
-      }}
-    >
-      <div className="flex items-center gap-2">
-        <Icon
-          className={`w-4 h-4 ${isAnimated ? 'animate-spin' : ''}`}
-          style={{ color: config.color }}
-        />
-        <div className="flex flex-col">
-          <span
-            className="text-sm font-medium"
-            style={{ color: 'rgb(var(--text-primary))' }}
-          >
-            {config.label}: {stageName}
-            {progress.status === 'repairing' && progress.repairAttempt && (
-              <span className="text-xs ml-1" style={{ color: 'rgb(var(--text-muted))' }}>
-                (attempt {progress.repairAttempt}/{progress.maxRepairAttempts || 3})
-              </span>
-            )}
-          </span>
-          <span
-            className="text-xs"
-            style={{ color: 'rgb(var(--text-muted))' }}
-          >
-            Stage {stageIndex + 1} of {TOTAL_PIPELINE_STAGES}
-          </span>
-        </div>
-      </div>
-      <ProgressBar progress={progressPercent} />
-    </div>
-  );
 }

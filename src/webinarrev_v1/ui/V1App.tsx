@@ -39,6 +39,7 @@ function V1AppContent() {
     exportZip,
     removeProject,
     clearError,
+    cancelPipeline,
   } = useProjectStore();
 
   const handleCreateProject = async (formData: ProjectFormData) => {
@@ -114,6 +115,7 @@ function V1AppContent() {
             pipelineProgress={pipelineProgress}
             onBack={() => handleSelectProject(null)}
             onRunPipeline={runPipeline}
+            onCancelPipeline={cancelPipeline}
             activeTab={activeTab}
             onTabChange={tab => setActiveTab(tab as TabId)}
           />
@@ -135,6 +137,7 @@ function V1AppContent() {
               isPipelineRunning={isPipelineRunning}
               onRunPipeline={runPipeline}
               onEditDeliverable={handleEditDeliverable}
+              onRegenerate={handleRegenerate}
             />
           )}
 
@@ -144,6 +147,7 @@ function V1AppContent() {
               onRevalidate={revalidateDeliverable}
               onExportDocx={exportDocx}
               onEditDeliverable={handleEditDeliverable}
+              onRegenerate={handleRegenerate}
               isPipelineRunning={isPipelineRunning}
               onRunPipeline={runPipeline}
             />

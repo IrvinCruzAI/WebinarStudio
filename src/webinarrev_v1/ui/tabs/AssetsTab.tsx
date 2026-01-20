@@ -14,6 +14,7 @@ import {
   Eye,
   Code,
   Pencil,
+  ChevronDown,
 } from 'lucide-react';
 import type { DeliverableId, ValidationResult, WR3, WR4, WR5, WR6, WR7, WR8 } from '../../contracts';
 import { DELIVERABLES, type DeliverableCategory } from '../../contracts/deliverables';
@@ -39,6 +40,7 @@ interface AssetsTabProps {
   onRevalidate: (id: DeliverableId) => Promise<ValidationResult>;
   onExportDocx: (id: DeliverableId) => Promise<void>;
   onEditDeliverable?: (id: DeliverableId, field: string, value: unknown) => Promise<void>;
+  onRegenerate?: (id: DeliverableId, cascade: boolean) => Promise<void>;
   isPipelineRunning?: boolean;
   onRunPipeline?: () => void;
 }
@@ -48,6 +50,7 @@ export function AssetsTab({
   onRevalidate,
   onExportDocx,
   onEditDeliverable,
+  onRegenerate,
   isPipelineRunning,
   onRunPipeline,
 }: AssetsTabProps) {
@@ -55,6 +58,8 @@ export function AssetsTab({
   const [isRevalidating, setIsRevalidating] = useState<DeliverableId | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<DeliverableCategory | 'all'>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('preview');
+  const [showRegenerateMenu, setShowRegenerateMenu] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
   const wr1Artifact = artifacts.get('WR1');
   const wr2Artifact = artifacts.get('WR2');
@@ -76,6 +81,17 @@ export function AssetsTab({
       await onRevalidate(id);
     } finally {
       setIsRevalidating(null);
+    }
+  };
+
+  const handleRegenerate = async (cascade: boolean) => {
+    if (!selectedAsset || !onRegenerate) return;
+    setIsRegenerating(true);
+    setShowRegenerateMenu(false);
+    try {
+      await onRegenerate(selectedAsset, cascade);
+    } finally {
+      setIsRegenerating(false);
     }
   };
 
@@ -237,12 +253,58 @@ export function AssetsTab({
                 <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
                 <button
                   onClick={() => handleRevalidate(selectedAsset)}
-                  disabled={isRevalidating === selectedAsset || !selectedArtifact}
+                  disabled={isRevalidating === selectedAsset || !selectedArtifact || isPipelineRunning}
                   className="btn-secondary text-sm"
                 >
                   <RefreshCw className={`w-4 h-4 ${isRevalidating === selectedAsset ? 'animate-spin' : ''}`} />
                   Revalidate
                 </button>
+                {onRegenerate && selectedAsset && selectedAsset !== 'WR9' && (
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowRegenerateMenu(!showRegenerateMenu)}
+                      disabled={isRegenerating || isPipelineRunning}
+                      className="btn-secondary text-sm"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${isRegenerating ? 'animate-spin' : ''}`} />
+                      Regenerate
+                      <ChevronDown className="w-3 h-3 ml-1" />
+                    </button>
+                    {showRegenerateMenu && (
+                      <div
+                        className="absolute right-0 mt-1 w-64 rounded-lg shadow-lg overflow-hidden z-10"
+                        style={{
+                          background: 'rgb(var(--surface-elevated))',
+                          border: '1px solid rgb(var(--border-default))',
+                        }}
+                      >
+                        <button
+                          onClick={() => handleRegenerate(false)}
+                          className="w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[rgb(var(--surface-glass))]"
+                          style={{
+                            color: 'rgb(var(--text-primary))',
+                            borderBottom: '1px solid rgb(var(--border-default))',
+                          }}
+                        >
+                          <div className="font-medium">Regenerate This Only</div>
+                          <div className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+                            Only regenerate {selectedAsset}, keep others unchanged
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => handleRegenerate(true)}
+                          className="w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[rgb(var(--surface-glass))]"
+                          style={{ color: 'rgb(var(--text-primary))' }}
+                        >
+                          <div className="font-medium">Regenerate This + Downstream</div>
+                          <div className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+                            Regenerate {selectedAsset} and all dependents
+                          </div>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <button
                   onClick={() => onExportDocx(selectedAsset)}
                   disabled={!selectedArtifact?.validated}
