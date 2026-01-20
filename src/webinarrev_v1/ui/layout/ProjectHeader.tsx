@@ -1,4 +1,4 @@
-import { ArrowLeft, Play } from 'lucide-react';
+import { ArrowLeft, Play, Building2, User, Clock, Target } from 'lucide-react';
 import type { ProjectMetadata } from '../../contracts';
 import type { PipelineProgress } from '../../pipeline/orchestrator';
 import PipelineProgressPanel from '../components/PipelineProgressPanel';
@@ -19,6 +19,7 @@ const TABS = [
   { id: 'framework', label: 'Framework' },
   { id: 'assets', label: 'Assets' },
   { id: 'qa-export', label: 'QA & Export' },
+  { id: 'project-setup', label: 'Project Setup' },
 ];
 
 export function ProjectHeader({
@@ -32,6 +33,21 @@ export function ProjectHeader({
   onTabChange,
 }: ProjectHeaderProps) {
   const hasErrors = pipelineProgress.some(p => p.status === 'error');
+
+  const infoItems: Array<{ icon?: typeof Building2; label: string }> = [];
+
+  if (project.settings?.client_name) {
+    infoItems.push({ icon: User, label: project.settings.client_name });
+  }
+  if (project.settings?.company_name) {
+    infoItems.push({ icon: Building2, label: project.settings.company_name });
+  }
+  if (project.settings?.webinar_length_minutes) {
+    infoItems.push({ icon: Clock, label: `${project.settings.webinar_length_minutes} min` });
+  }
+  if (project.settings?.cta_mode) {
+    infoItems.push({ icon: Target, label: project.settings.cta_mode });
+  }
 
   return (
     <header
@@ -47,15 +63,26 @@ export function ProjectHeader({
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1
-              className="text-lg font-semibold"
-              style={{ color: 'rgb(var(--text-primary))' }}
-            >
-              {project.title}
-            </h1>
-            <div className="flex items-center gap-2 mt-0.5">
+            <div className="flex items-center gap-3">
+              <h1
+                className="text-lg font-semibold"
+                style={{ color: 'rgb(var(--text-primary))' }}
+              >
+                {project.title}
+              </h1>
               <StatusBadge status={project.status} />
             </div>
+            {infoItems.length > 0 && (
+              <div className="flex items-center gap-2 mt-1 text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+                {infoItems.map((item, i) => (
+                  <span key={i} className="flex items-center gap-1">
+                    {i > 0 && <span className="mx-1">|</span>}
+                    {item.icon && <item.icon className="w-3 h-3" />}
+                    {item.label}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

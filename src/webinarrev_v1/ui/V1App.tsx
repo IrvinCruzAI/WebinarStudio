@@ -8,12 +8,13 @@ import { DossierTab } from './tabs/DossierTab';
 import { FrameworkBuilderTab } from './tabs/FrameworkBuilderTab';
 import { AssetsTab } from './tabs/AssetsTab';
 import { QAExportTab } from './tabs/QAExportTab';
+import { ProjectSetupTab } from './tabs/ProjectSetupTab';
 import { ActionableErrorDisplay } from './components/ActionableErrorDisplay';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useProjectStore } from './hooks/useProjectStore';
 import type { DeliverableId } from '../contracts';
 
-type TabId = 'dossier' | 'framework' | 'assets' | 'qa-export';
+type TabId = 'dossier' | 'framework' | 'assets' | 'qa-export' | 'project-setup';
 
 function V1AppContent() {
   const [showCreateWizard, setShowCreateWizard] = useState(false);
@@ -73,7 +74,7 @@ function V1AppContent() {
   };
 
   const handleNavigateToTab = (tab: string, _targetDeliverableId?: DeliverableId) => {
-    if (tab === 'dossier' || tab === 'framework' || tab === 'assets' || tab === 'qa-export') {
+    if (tab === 'dossier' || tab === 'framework' || tab === 'assets' || tab === 'qa-export' || tab === 'project-setup') {
       setActiveTab(tab as TabId);
     }
   };
@@ -161,6 +162,15 @@ function V1AppContent() {
               onExportDocx={exportDocx}
               onNavigateToTab={handleNavigateToTab}
               onRevalidateAll={revalidateAll}
+            />
+          )}
+
+          {activeTab === 'project-setup' && (
+            <ProjectSetupTab
+              project={selectedProject}
+              artifacts={artifacts}
+              isPipelineRunning={isPipelineRunning}
+              onRunPipeline={runPipeline}
             />
           )}
         </div>

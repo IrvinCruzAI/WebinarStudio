@@ -192,6 +192,10 @@ function ProjectCard({ project, onClick, onDelete }: ProjectCardProps) {
     onDelete();
   };
 
+  const clientName = project.settings?.client_name;
+  const ctaMode = project.settings?.cta_mode;
+  const duration = project.settings?.webinar_length_minutes;
+
   return (
     <div
       onClick={onClick}
@@ -223,29 +227,35 @@ function ProjectCard({ project, onClick, onDelete }: ProjectCardProps) {
       </div>
 
       <h3
-        className="font-semibold mb-1 line-clamp-2"
+        className="font-semibold mb-0.5 line-clamp-2"
         style={{ color: 'rgb(var(--text-primary))' }}
       >
         {project.title}
       </h3>
 
-      <div className="flex items-center gap-3 mb-4">
-        {project.settings?.audience_temperature && (
-          <span
-            className="text-xs flex items-center gap-1"
-            style={{ color: 'rgb(var(--text-muted))' }}
-          >
-            <Target className="w-3 h-3" />
-            {formatAudienceTemp(project.settings.audience_temperature)}
-          </span>
-        )}
-        <span
-          className="text-xs flex items-center gap-1"
-          style={{ color: 'rgb(var(--text-muted))' }}
+      {clientName && (
+        <p
+          className="text-sm mb-2 line-clamp-1"
+          style={{ color: 'rgb(var(--text-secondary))' }}
         >
+          {clientName}
+        </p>
+      )}
+
+      <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mb-4 text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+        <span className="flex items-center gap-1">
           <Clock className="w-3 h-3" />
           {formatRelativeTime(project.updated_at)}
         </span>
+        {ctaMode && (
+          <span className="flex items-center gap-1">
+            <Target className="w-3 h-3" />
+            {ctaMode}
+          </span>
+        )}
+        {duration && (
+          <span>{duration}min</span>
+        )}
       </div>
 
       <div className="space-y-2">

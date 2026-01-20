@@ -1,38 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   User,
-  Building2,
   Target,
   Lightbulb,
   Shield,
   FileText,
   ChevronDown,
   ChevronRight,
-  Edit3,
   Eye,
-  Save,
-  RotateCcw,
   AlertTriangle,
-  Clock,
-  Settings,
   Play,
-  StickyNote,
-  RefreshCw,
 } from 'lucide-react';
 import type { ProjectMetadata, DeliverableId, WR1 } from '../../contracts';
-import { readTranscript, writeTranscript } from '../../store/storageService';
-import { formatDateTime } from '../utils/formatters';
-import { TextMetrics } from '../components/TextMetrics';
-import { FileUploadButton } from '../components/FileUploadButton';
-import { assessInputQuality } from '../../utils/inputQuality';
-import { InputQualityIndicator } from '../components/InputQualityIndicator';
-
-interface TranscriptData {
-  build_transcript: string;
-  intake_transcript?: string;
-  operator_notes?: string;
-  created_at: number;
-}
 
 interface DossierTabProps {
   project: ProjectMetadata;
@@ -48,63 +27,17 @@ interface DossierTabProps {
 }
 
 export function DossierTab({
-  project,
   artifacts,
   isPipelineRunning,
   onRunPipeline,
-  onEditDeliverable,
 }: DossierTabProps) {
   const [viewMode, setViewMode] = useState<'formatted' | 'json'>('formatted');
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(['client', 'webinar', 'themes', 'proof', 'inputs'])
+    new Set(['client', 'webinar', 'themes', 'proof'])
   );
-  const [transcripts, setTranscripts] = useState<TranscriptData | null>(null);
-  const [isLoadingTranscripts, setIsLoadingTranscripts] = useState(true);
-  const [isEditingTranscripts, setIsEditingTranscripts] = useState(false);
-  const [editedBuild, setEditedBuild] = useState('');
-  const [editedIntake, setEditedIntake] = useState('');
-  const [editedNotes, setEditedNotes] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-  const [activeTranscript, setActiveTranscript] = useState<'build' | 'intake' | 'notes'>('build');
 
   const wr1Artifact = artifacts.get('WR1');
   const wr1 = wr1Artifact?.content as WR1 | undefined;
-
-  useEffect(() => {
-    loadTranscripts();
-  }, [project.project_id]);
-
-  const loadTranscripts = async () => {
-    setIsLoadingTranscripts(true);
-    try {
-      const data = await readTranscript(project.project_id);
-      if (data) {
-        setTranscripts(data as TranscriptData);
-        setEditedBuild(data.build_transcript || '');
-        setEditedIntake(data.intake_transcript || '');
-        setEditedNotes(data.operator_notes || '');
-      }
-    } finally {
-      setIsLoadingTranscripts(false);
-    }
-  };
-
-  const handleSaveTranscripts = async () => {
-    setIsSaving(true);
-    try {
-      const updatedData: TranscriptData = {
-        build_transcript: editedBuild,
-        intake_transcript: editedIntake || undefined,
-        operator_notes: editedNotes || undefined,
-        created_at: Date.now(),
-      };
-      await writeTranscript(project.project_id, updatedData);
-      setTranscripts(updatedData);
-      setIsEditingTranscripts(false);
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => {
@@ -117,10 +50,6 @@ export function DossierTab({
       return newSet;
     });
   };
-
-  const wordCount = (text: string) => text.trim().split(/\s+/).filter(Boolean).length;
-
-  const inputsStale = transcripts && wr1Artifact && transcripts.created_at > wr1Artifact.generated_at;
 
   if (!wr1) {
     return (
@@ -188,14 +117,6 @@ export function DossierTab({
             </button>
           </div>
         </div>
-
-        {inputsStale && (
-          <StaleBanner
-            message="Input transcripts were modified after this dossier was generated"
-            onRerun={onRunPipeline}
-            isPipelineRunning={isPipelineRunning}
-          />
-        )}
 
         {viewMode === 'json' ? (
           <JsonViewer content={wr1} />
@@ -308,42 +229,6 @@ export function DossierTab({
               >
                 {wr1.cleaned_transcript || 'No transcript available'}
               </div>
-            </DossierSection>
-
-            <DossierSection
-              id="inputs"
-              title="Inputs & Settings"
-              icon={Settings}
-              expanded={expandedSections.has('inputs')}
-              onToggle={() => toggleSection('inputs')}
-            >
-              <InputsSettingsSection
-                project={project}
-                transcripts={transcripts}
-                isLoading={isLoadingTranscripts}
-                isEditing={isEditingTranscripts}
-                editedBuild={editedBuild}
-                editedIntake={editedIntake}
-                editedNotes={editedNotes}
-                activeTranscript={activeTranscript}
-                isSaving={isSaving}
-                onSetActiveTranscript={setActiveTranscript}
-                onSetEditedBuild={setEditedBuild}
-                onSetEditedIntake={setEditedIntake}
-                onSetEditedNotes={setEditedNotes}
-                onToggleEditing={() => setIsEditingTranscripts(!isEditingTranscripts)}
-                onSave={handleSaveTranscripts}
-                onCancel={() => {
-                  setEditedBuild(transcripts?.build_transcript || '');
-                  setEditedIntake(transcripts?.intake_transcript || '');
-                  setEditedNotes(transcripts?.operator_notes || '');
-                  setIsEditingTranscripts(false);
-                }}
-                wordCount={wordCount}
-                isPipelineRunning={isPipelineRunning}
-                onRunPipeline={onRunPipeline}
-                artifacts={artifacts}
-              />
             </DossierSection>
           </>
         )}
@@ -605,346 +490,3 @@ function JsonViewer({ content }: { content: unknown }) {
   );
 }
 
-function StaleBanner({
-  message,
-  onRerun,
-  isPipelineRunning,
-}: {
-  message: string;
-  onRerun: () => void;
-  isPipelineRunning: boolean;
-}) {
-  return (
-    <div
-      className="p-4 rounded-xl flex items-center justify-between"
-      style={{
-        background: 'rgb(var(--warning) / 0.1)',
-        border: '1px solid rgb(var(--warning) / 0.2)',
-      }}
-    >
-      <div className="flex items-center gap-3">
-        <AlertTriangle className="w-5 h-5" style={{ color: 'rgb(var(--warning))' }} />
-        <div>
-          <p className="font-medium text-sm" style={{ color: 'rgb(var(--text-primary))' }}>
-            Outputs may be stale
-          </p>
-          <p className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
-            {message}
-          </p>
-        </div>
-      </div>
-      <button onClick={onRerun} disabled={isPipelineRunning} className="btn-primary text-sm">
-        <Play className="w-4 h-4" />
-        Re-run
-      </button>
-    </div>
-  );
-}
-
-interface InputsSettingsSectionProps {
-  project: ProjectMetadata;
-  transcripts: TranscriptData | null;
-  isLoading: boolean;
-  isEditing: boolean;
-  editedBuild: string;
-  editedIntake: string;
-  editedNotes: string;
-  activeTranscript: 'build' | 'intake' | 'notes';
-  isSaving: boolean;
-  onSetActiveTranscript: (t: 'build' | 'intake' | 'notes') => void;
-  onSetEditedBuild: (v: string) => void;
-  onSetEditedIntake: (v: string) => void;
-  onSetEditedNotes: (v: string) => void;
-  onToggleEditing: () => void;
-  onSave: () => void;
-  onCancel: () => void;
-  wordCount: (text: string) => number;
-  isPipelineRunning: boolean;
-  onRunPipeline: () => void;
-  artifacts: Map<DeliverableId, {
-    content: unknown;
-    validated: boolean;
-    generated_at: number;
-    edited_at?: number;
-  }>;
-}
-
-function InputsSettingsSection({
-  project,
-  transcripts,
-  isLoading,
-  isEditing,
-  editedBuild,
-  editedIntake,
-  editedNotes,
-  activeTranscript,
-  isSaving,
-  onSetActiveTranscript,
-  onSetEditedBuild,
-  onSetEditedIntake,
-  onSetEditedNotes,
-  onToggleEditing,
-  onSave,
-  onCancel,
-  wordCount,
-  isPipelineRunning,
-  onRunPipeline,
-  artifacts,
-}: InputsSettingsSectionProps) {
-  if (isLoading) {
-    return (
-      <div className="space-y-4">
-        <div className="skeleton h-8 w-48 rounded" />
-        <div className="skeleton h-32 rounded-xl" />
-      </div>
-    );
-  }
-
-  const currentBuild = isEditing ? editedBuild : (transcripts?.build_transcript || '');
-  const currentIntake = isEditing ? editedIntake : (transcripts?.intake_transcript || '');
-  const currentNotes = isEditing ? editedNotes : (transcripts?.operator_notes || '');
-
-  const qualityResult = assessInputQuality(currentBuild, currentIntake, currentNotes);
-
-  const hasWR1 = artifacts.has('WR1');
-  const hasWR2 = artifacts.has('WR2');
-  const wr1GeneratedAt = artifacts.get('WR1')?.generated_at || 0;
-  const inputsUpdatedAt = transcripts?.created_at || 0;
-  const inputsAreNewer = inputsUpdatedAt > wr1GeneratedAt;
-
-  return (
-    <div className="space-y-6">
-      {inputsAreNewer && hasWR1 && (
-        <div
-          className="p-4 rounded-xl"
-          style={{
-            background: 'rgb(var(--warning) / 0.1)',
-            border: '1px solid rgb(var(--warning) / 0.2)',
-          }}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                <AlertTriangle className="w-4 h-4" style={{ color: 'rgb(var(--warning))' }} />
-                <span className="text-sm font-semibold" style={{ color: 'rgb(var(--text-primary))' }}>
-                  Inputs Modified After Generation
-                </span>
-              </div>
-              <p className="text-xs mb-3" style={{ color: 'rgb(var(--text-secondary))' }}>
-                The input transcripts were modified after deliverables were generated. Consider regenerating to reflect the latest changes.
-              </p>
-              <div className="flex gap-2">
-                <button
-                  onClick={onRunPipeline}
-                  disabled={isPipelineRunning}
-                  className="btn-primary text-xs"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  Rerun Full Pipeline
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div
-        className="p-4 rounded-xl"
-        style={{
-          background: 'rgb(var(--surface-base))',
-          border: '1px solid rgb(var(--border-subtle))',
-        }}
-      >
-        <h4 className="text-sm font-medium mb-3" style={{ color: 'rgb(var(--text-primary))' }}>
-          Project Settings
-        </h4>
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <label className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>CTA Mode</label>
-            <p className="text-sm font-medium" style={{ color: 'rgb(var(--text-primary))' }}>
-              {project.settings.cta_mode}
-            </p>
-          </div>
-          <div>
-            <label className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>Audience Temperature</label>
-            <p className="text-sm font-medium" style={{ color: 'rgb(var(--text-primary))' }}>
-              {project.settings.audience_temperature}
-            </p>
-          </div>
-          <div>
-            <label className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>Duration</label>
-            <p className="text-sm font-medium" style={{ color: 'rgb(var(--text-primary))' }}>
-              {project.settings.webinar_length_minutes} min
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <InputQualityIndicator quality={qualityResult} showDetails={false} />
-
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h4 className="text-sm font-medium" style={{ color: 'rgb(var(--text-primary))' }}>
-            Source Transcripts
-          </h4>
-          <div className="flex items-center gap-2">
-            {isEditing && (
-              <FileUploadButton
-                onFileContent={(content) => {
-                  if (activeTranscript === 'build') onSetEditedBuild(content);
-                  else if (activeTranscript === 'intake') onSetEditedIntake(content);
-                  else onSetEditedNotes(content);
-                }}
-                label="Upload .txt"
-              />
-            )}
-            <button onClick={onToggleEditing} className="btn-ghost text-xs">
-              {isEditing ? <Eye className="w-3.5 h-3.5" /> : <Edit3 className="w-3.5 h-3.5" />}
-              {isEditing ? 'Preview' : 'Edit'}
-            </button>
-          </div>
-        </div>
-
-        <div className="flex gap-1 mb-3">
-          {(['build', 'intake', 'notes'] as const).map((t) => {
-            const text = t === 'build' ? currentBuild : t === 'intake' ? currentIntake : currentNotes;
-            const wc = wordCount(text);
-            let qualityColor = 'rgb(var(--text-muted))';
-
-            if (t === 'build') {
-              if (wc === 0) qualityColor = 'rgb(var(--error))';
-              else if (wc < 500) qualityColor = 'rgb(var(--error))';
-              else if (wc < 800) qualityColor = 'rgb(var(--warning))';
-              else qualityColor = 'rgb(var(--success))';
-            }
-
-            return (
-              <button
-                key={t}
-                onClick={() => onSetActiveTranscript(t)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                  activeTranscript === t
-                    ? 'bg-[rgb(var(--surface-base))] text-[rgb(var(--text-primary))]'
-                    : 'text-[rgb(var(--text-muted))] hover:text-[rgb(var(--text-secondary))]'
-                }`}
-              >
-                {t === 'build' ? 'Build' : t === 'intake' ? 'Intake' : 'Notes'}
-                <span className="ml-1 opacity-60" style={{ color: qualityColor }}>
-                  ({wc})
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div
-          className="rounded-xl overflow-hidden"
-          style={{
-            background: 'rgb(var(--surface-base))',
-            border: '1px solid rgb(var(--border-subtle))',
-          }}
-        >
-          {activeTranscript === 'build' && (
-            <TranscriptPanel
-              content={currentBuild}
-              isEditing={isEditing}
-              onChange={onSetEditedBuild}
-              placeholder="Build transcript content..."
-            />
-          )}
-          {activeTranscript === 'intake' && (
-            <TranscriptPanel
-              content={currentIntake}
-              isEditing={isEditing}
-              onChange={onSetEditedIntake}
-              placeholder="Intake transcript (optional)..."
-            />
-          )}
-          {activeTranscript === 'notes' && (
-            <TranscriptPanel
-              content={currentNotes}
-              isEditing={isEditing}
-              onChange={onSetEditedNotes}
-              placeholder="Operator notes (optional)..."
-            />
-          )}
-        </div>
-
-        {!isEditing && (
-          <div className="mt-3">
-            <TextMetrics
-              text={activeTranscript === 'build' ? currentBuild : activeTranscript === 'intake' ? currentIntake : currentNotes}
-              minWords={activeTranscript === 'build' ? 500 : activeTranscript === 'intake' ? 200 : 20}
-              recommendedWords={activeTranscript === 'build' ? 800 : activeTranscript === 'intake' ? 300 : 50}
-              compact
-            />
-          </div>
-        )}
-
-        {isEditing && (
-          <div className="flex items-center justify-end gap-2 mt-3">
-            <button onClick={onCancel} className="btn-ghost text-sm">
-              <RotateCcw className="w-4 h-4" />
-              Cancel
-            </button>
-            <button onClick={onSave} disabled={isSaving} className="btn-primary text-sm">
-              <Save className={`w-4 h-4 ${isSaving ? 'animate-pulse' : ''}`} />
-              {isSaving ? 'Saving...' : 'Save Changes'}
-            </button>
-          </div>
-        )}
-
-        {transcripts?.created_at && (
-          <div className="flex items-center gap-2 mt-3 text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
-            <Clock className="w-3.5 h-3.5" />
-            Last modified: {formatDateTime(transcripts.created_at)}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function TranscriptPanel({
-  content,
-  isEditing,
-  onChange,
-  placeholder,
-}: {
-  content: string;
-  isEditing: boolean;
-  onChange: (v: string) => void;
-  placeholder: string;
-}) {
-  if (!content && !isEditing) {
-    return (
-      <div className="p-8 text-center">
-        <StickyNote className="w-8 h-8 mx-auto mb-2" style={{ color: 'rgb(var(--text-muted))' }} />
-        <p className="text-sm" style={{ color: 'rgb(var(--text-muted))' }}>
-          Not provided
-        </p>
-      </div>
-    );
-  }
-
-  if (isEditing) {
-    return (
-      <textarea
-        value={content}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full p-4 min-h-[200px] text-sm font-mono resize-none bg-transparent focus:outline-none"
-        style={{ color: 'rgb(var(--text-secondary))' }}
-      />
-    );
-  }
-
-  return (
-    <div
-      className="p-4 max-h-[200px] overflow-y-auto scrollbar-thin font-mono text-sm whitespace-pre-wrap"
-      style={{ color: 'rgb(var(--text-secondary))', lineHeight: 1.6 }}
-    >
-      {content}
-    </div>
-  );
-}
