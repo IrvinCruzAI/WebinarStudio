@@ -164,12 +164,6 @@ export function DossierTab({
           <JsonViewer content={wr1} />
         ) : (
           <>
-            <ExecutiveSummaryHero
-              summary={wr1.executive_summary}
-              onRunPipeline={onRunPipeline}
-              isPipelineRunning={isPipelineRunning}
-            />
-
             <DossierSection
               id="client"
               title="Client & Speaker"
@@ -212,6 +206,12 @@ export function DossierTab({
                 />
               </div>
             </DossierSection>
+
+            <ExecutiveSummaryHero
+              summary={wr1.executive_summary}
+              onRunPipeline={onRunPipeline}
+              isPipelineRunning={isPipelineRunning}
+            />
 
             <DossierSection
               id="webinar"
