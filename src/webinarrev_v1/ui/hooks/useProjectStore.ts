@@ -133,6 +133,10 @@ export function useProjectStore() {
       cta_mode: formData.ctaMode,
       audience_temperature: formData.audienceTemperature,
       webinar_length_minutes: formData.webinarLengthMinutes,
+      client_name: formData.clientName || undefined,
+      speaker_name: formData.speakerName || undefined,
+      company_name: formData.companyName || undefined,
+      contact_email: formData.contactEmail || undefined,
     });
 
     await writeTranscript(projectId, {

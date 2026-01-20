@@ -9,6 +9,10 @@ const DRAFTS_STORE = 'drafts';
 export interface DraftData {
   draft_id: string;
   title: string;
+  client_name?: string;
+  speaker_name?: string;
+  company_name?: string;
+  contact_email?: string;
   build_transcript: string;
   intake_transcript: string;
   operator_notes: string;

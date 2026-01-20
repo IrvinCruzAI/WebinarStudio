@@ -58,6 +58,10 @@ export function createProject(
     cta_mode: CTA;
     audience_temperature: AudienceTemperature;
     webinar_length_minutes: number;
+    client_name?: string;
+    speaker_name?: string;
+    company_name?: string;
+    contact_email?: string;
   }
 ): ProjectMetadata {
   const project: ProjectMetadata = {

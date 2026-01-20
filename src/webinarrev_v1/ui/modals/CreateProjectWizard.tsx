@@ -12,15 +12,24 @@ import {
   Copy,
   Clock,
   AlertTriangle,
+  User,
+  Sliders,
+  Thermometer,
+  Target,
+  Timer,
 } from 'lucide-react';
 import { FileUploadButton } from '../components/FileUploadButton';
 import { TextMetrics } from '../components/TextMetrics';
 import { InputQualityIndicator } from '../components/InputQualityIndicator';
 import { assessInputQuality, BUILD_TRANSCRIPT_EXAMPLES, INTAKE_TRANSCRIPT_EXAMPLES, OPERATOR_NOTES_EXAMPLES } from '../../utils/inputQuality';
-import { saveDraft, loadDraft, deleteDraft, listAllDrafts, type DraftData } from '../../store/indexedDbWrapper';
+import { saveDraft, deleteDraft, listAllDrafts, type DraftData } from '../../store/indexedDbWrapper';
 
 export interface ProjectFormData {
   title: string;
+  clientName: string;
+  speakerName: string;
+  companyName: string;
+  contactEmail: string;
   buildTranscript: string;
   intakeTranscript: string;
   operatorNotes: string;
@@ -35,17 +44,32 @@ interface CreateProjectWizardProps {
   onSubmit: (data: ProjectFormData) => Promise<void>;
 }
 
-type Step = 'basics' | 'inputs' | 'confirm';
+type Step = 'basics' | 'inputs' | 'configuration' | 'confirm';
 
 const STEPS: { id: Step; label: string; icon: typeof FileText }[] = [
-  { id: 'basics', label: 'Basics', icon: Settings },
+  { id: 'basics', label: 'Basics', icon: User },
   { id: 'inputs', label: 'Inputs', icon: FileText },
+  { id: 'configuration', label: 'Config', icon: Sliders },
   { id: 'confirm', label: 'Confirm', icon: Play },
 ];
 
 function generateDraftId(): string {
   return `draft_${crypto.randomUUID()}`;
 }
+
+const DEFAULT_FORM_DATA: ProjectFormData = {
+  title: '',
+  clientName: '',
+  speakerName: '',
+  companyName: '',
+  contactEmail: '',
+  buildTranscript: '',
+  intakeTranscript: '',
+  operatorNotes: '',
+  ctaMode: 'book_call',
+  audienceTemperature: 'warm',
+  webinarLengthMinutes: 60,
+};
 
 export function CreateProjectWizard({ isOpen, onClose, onSubmit }: CreateProjectWizardProps) {
   const [currentStep, setCurrentStep] = useState<Step>('basics');
@@ -55,15 +79,7 @@ export function CreateProjectWizard({ isOpen, onClose, onSubmit }: CreateProject
   const [showResumeDraft, setShowResumeDraft] = useState(false);
   const [existingDrafts, setExistingDrafts] = useState<DraftData[]>([]);
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const [formData, setFormData] = useState<ProjectFormData>({
-    title: '',
-    buildTranscript: '',
-    intakeTranscript: '',
-    operatorNotes: '',
-    ctaMode: 'book_call',
-    audienceTemperature: 'warm',
-    webinarLengthMinutes: 60,
-  });
+  const [formData, setFormData] = useState<ProjectFormData>(DEFAULT_FORM_DATA);
 
   useEffect(() => {
     if (isOpen) {
@@ -88,8 +104,8 @@ export function CreateProjectWizard({ isOpen, onClose, onSubmit }: CreateProject
   useEffect(() => {
     if (!isOpen) return;
 
-    const hasContent = formData.title || formData.buildTranscript || formData.intakeTranscript || formData.operatorNotes;
-    setHasUnsavedChanges(hasContent);
+    const hasContent = formData.title || formData.clientName || formData.buildTranscript || formData.intakeTranscript || formData.operatorNotes;
+    setHasUnsavedChanges(!!hasContent);
 
     if (hasContent) {
       if (autoSaveTimerRef.current) {
@@ -125,6 +141,10 @@ export function CreateProjectWizard({ isOpen, onClose, onSubmit }: CreateProject
       const draftData: DraftData = {
         draft_id: draftId,
         title: formData.title,
+        client_name: formData.clientName,
+        speaker_name: formData.speakerName,
+        company_name: formData.companyName,
+        contact_email: formData.contactEmail,
         build_transcript: formData.buildTranscript,
         intake_transcript: formData.intakeTranscript,
         operator_notes: formData.operatorNotes,
@@ -143,6 +163,10 @@ export function CreateProjectWizard({ isOpen, onClose, onSubmit }: CreateProject
   const handleResumeDraft = async (draft: DraftData) => {
     setFormData({
       title: draft.title,
+      clientName: draft.client_name || '',
+      speakerName: draft.speaker_name || '',
+      companyName: draft.company_name || '',
+      contactEmail: draft.contact_email || '',
       buildTranscript: draft.build_transcript,
       intakeTranscript: draft.intake_transcript,
       operatorNotes: draft.operator_notes,
@@ -158,9 +182,11 @@ export function CreateProjectWizard({ isOpen, onClose, onSubmit }: CreateProject
   const canProceed = () => {
     switch (currentStep) {
       case 'basics':
-        return formData.title.trim().length > 0;
+        return formData.title.trim().length > 0 && formData.clientName.trim().length > 0;
       case 'inputs':
         return formData.buildTranscript.trim().length > 0;
+      case 'configuration':
+        return true;
       case 'confirm':
         return true;
       default:
@@ -170,12 +196,14 @@ export function CreateProjectWizard({ isOpen, onClose, onSubmit }: CreateProject
 
   const handleNext = () => {
     if (currentStep === 'basics') setCurrentStep('inputs');
-    else if (currentStep === 'inputs') setCurrentStep('confirm');
+    else if (currentStep === 'inputs') setCurrentStep('configuration');
+    else if (currentStep === 'configuration') setCurrentStep('confirm');
   };
 
   const handleBack = () => {
     if (currentStep === 'inputs') setCurrentStep('basics');
-    else if (currentStep === 'confirm') setCurrentStep('inputs');
+    else if (currentStep === 'configuration') setCurrentStep('inputs');
+    else if (currentStep === 'confirm') setCurrentStep('configuration');
   };
 
   const handleSubmit = async () => {
@@ -184,15 +212,7 @@ export function CreateProjectWizard({ isOpen, onClose, onSubmit }: CreateProject
       await onSubmit(formData);
       await deleteDraft(draftId);
       onClose();
-      setFormData({
-        title: '',
-        buildTranscript: '',
-        intakeTranscript: '',
-        operatorNotes: '',
-        ctaMode: 'book_call',
-        audienceTemperature: 'warm',
-        webinarLengthMinutes: 60,
-      });
+      setFormData(DEFAULT_FORM_DATA);
       setCurrentStep('basics');
       setHasUnsavedChanges(false);
     } finally {
@@ -242,7 +262,7 @@ export function CreateProjectWizard({ isOpen, onClose, onSubmit }: CreateProject
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate" style={{ color: 'rgb(var(--text-primary))' }}>
-                      {draft.title || 'Untitled Draft'}
+                      {draft.title || draft.client_name || 'Untitled Draft'}
                     </p>
                     <p className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
                       {new Date(draft.updated_at).toLocaleString()}
@@ -307,17 +327,17 @@ export function CreateProjectWizard({ isOpen, onClose, onSubmit }: CreateProject
           className="px-6 py-4 border-b"
           style={{ borderColor: 'rgb(var(--border-subtle))' }}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             {STEPS.map((step, index) => {
               const Icon = step.icon;
               const isActive = step.id === currentStep;
               const isCompleted = index < currentStepIndex;
 
               return (
-                <div key={step.id} className="flex items-center gap-2">
+                <div key={step.id} className="flex items-center gap-1">
                   {index > 0 && (
                     <div
-                      className="w-8 h-px"
+                      className="w-6 h-px"
                       style={{
                         background: isCompleted
                           ? 'rgb(var(--accent-primary))'
@@ -325,9 +345,9 @@ export function CreateProjectWizard({ isOpen, onClose, onSubmit }: CreateProject
                       }}
                     />
                   )}
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     <div
-                      className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
+                      className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
                       style={{
                         background: isActive
                           ? 'rgb(var(--accent-primary))'
@@ -339,12 +359,12 @@ export function CreateProjectWizard({ isOpen, onClose, onSubmit }: CreateProject
                     >
                       {isCompleted ? (
                         <Check
-                          className="w-4 h-4"
+                          className="w-3.5 h-3.5"
                           style={{ color: 'rgb(var(--accent-primary))' }}
                         />
                       ) : (
                         <Icon
-                          className="w-4 h-4"
+                          className="w-3.5 h-3.5"
                           style={{
                             color: isActive ? 'white' : 'rgb(var(--text-muted))',
                           }}
@@ -352,7 +372,7 @@ export function CreateProjectWizard({ isOpen, onClose, onSubmit }: CreateProject
                       )}
                     </div>
                     <span
-                      className="text-sm font-medium hidden sm:block"
+                      className="text-xs font-medium hidden sm:block"
                       style={{
                         color: isActive
                           ? 'rgb(var(--text-primary))'
@@ -374,6 +394,9 @@ export function CreateProjectWizard({ isOpen, onClose, onSubmit }: CreateProject
           )}
           {currentStep === 'inputs' && (
             <InputsStep formData={formData} setFormData={setFormData} />
+          )}
+          {currentStep === 'configuration' && (
+            <ConfigurationStep formData={formData} setFormData={setFormData} />
           )}
           {currentStep === 'confirm' && (
             <ConfirmStep formData={formData} />
@@ -437,84 +460,132 @@ function BasicsStep({ formData, setFormData }: StepProps) {
   return (
     <div className="space-y-6">
       <div>
-        <label
-          className="block text-sm font-medium mb-2"
-          style={{ color: 'rgb(var(--text-primary))' }}
-        >
-          Project Name *
-        </label>
-        <input
-          type="text"
-          value={formData.title}
-          onChange={e => setFormData(prev => ({ ...prev, title: e.target.value }))}
-          placeholder="e.g., Capacity Crisis Playbook"
-          className="input-field"
-          autoFocus
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
+        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2" style={{ color: 'rgb(var(--text-primary))' }}>
+          <Settings className="w-4 h-4" style={{ color: 'rgb(var(--accent-primary))' }} />
+          Project Info
+        </h3>
         <div>
           <label
             className="block text-sm font-medium mb-2"
             style={{ color: 'rgb(var(--text-primary))' }}
           >
-            Audience Temperature
+            Project Name *
           </label>
-          <select
-            value={formData.audienceTemperature}
-            onChange={e => setFormData(prev => ({
-              ...prev,
-              audienceTemperature: e.target.value as 'cold' | 'warm' | 'hot',
-            }))}
+          <input
+            type="text"
+            value={formData.title}
+            onChange={e => setFormData(prev => ({ ...prev, title: e.target.value }))}
+            placeholder="e.g., Capacity Crisis Playbook"
             className="input-field"
-          >
-            <option value="cold">Cold - New to topic</option>
-            <option value="warm">Warm - Familiar</option>
-            <option value="hot">Hot - Ready to buy</option>
-          </select>
-        </div>
-
-        <div>
-          <label
-            className="block text-sm font-medium mb-2"
-            style={{ color: 'rgb(var(--text-primary))' }}
-          >
-            CTA Mode
-          </label>
-          <select
-            value={formData.ctaMode}
-            onChange={e => setFormData(prev => ({
-              ...prev,
-              ctaMode: e.target.value as 'book_call' | 'buy_now',
-            }))}
-            className="input-field"
-          >
-            <option value="book_call">Book a Call</option>
-            <option value="buy_now">Buy Now</option>
-          </select>
+            autoFocus
+          />
+          <p className="text-xs mt-1" style={{ color: 'rgb(var(--text-muted))' }}>
+            Internal name for organizing your projects
+          </p>
         </div>
       </div>
 
-      <div>
-        <label
-          className="block text-sm font-medium mb-2"
-          style={{ color: 'rgb(var(--text-primary))' }}
+      <div
+        className="p-4 rounded-xl"
+        style={{
+          background: 'rgb(var(--surface-base))',
+          border: '1px solid rgb(var(--border-default))',
+        }}
+      >
+        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2" style={{ color: 'rgb(var(--text-primary))' }}>
+          <User className="w-4 h-4" style={{ color: 'rgb(var(--accent-primary))' }} />
+          Client Details
+        </h3>
+
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label
+                className="block text-sm font-medium mb-2"
+                style={{ color: 'rgb(var(--text-primary))' }}
+              >
+                Client / Business Name *
+              </label>
+              <input
+                type="text"
+                value={formData.clientName}
+                onChange={e => setFormData(prev => ({ ...prev, clientName: e.target.value }))}
+                placeholder="e.g., Acme Corp"
+                className="input-field"
+              />
+            </div>
+
+            <div>
+              <label
+                className="block text-sm font-medium mb-2"
+                style={{ color: 'rgb(var(--text-primary))' }}
+              >
+                Speaker Name
+                <span className="font-normal ml-2" style={{ color: 'rgb(var(--text-muted))' }}>
+                  Optional
+                </span>
+              </label>
+              <input
+                type="text"
+                value={formData.speakerName}
+                onChange={e => setFormData(prev => ({ ...prev, speakerName: e.target.value }))}
+                placeholder="e.g., John Smith"
+                className="input-field"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label
+                className="block text-sm font-medium mb-2"
+                style={{ color: 'rgb(var(--text-primary))' }}
+              >
+                Company / Organization
+                <span className="font-normal ml-2" style={{ color: 'rgb(var(--text-muted))' }}>
+                  Optional
+                </span>
+              </label>
+              <input
+                type="text"
+                value={formData.companyName}
+                onChange={e => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
+                placeholder="e.g., Acme Industries"
+                className="input-field"
+              />
+            </div>
+
+            <div>
+              <label
+                className="block text-sm font-medium mb-2"
+                style={{ color: 'rgb(var(--text-primary))' }}
+              >
+                Contact Email
+                <span className="font-normal ml-2" style={{ color: 'rgb(var(--text-muted))' }}>
+                  Optional
+                </span>
+              </label>
+              <input
+                type="email"
+                value={formData.contactEmail}
+                onChange={e => setFormData(prev => ({ ...prev, contactEmail: e.target.value }))}
+                placeholder="e.g., john@acme.com"
+                className="input-field"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {!formData.title && !formData.clientName && (
+        <div
+          className="flex items-center gap-2 text-xs"
+          style={{ color: 'rgb(var(--warning))' }}
         >
-          Webinar Length (minutes)
-        </label>
-        <input
-          type="number"
-          value={formData.webinarLengthMinutes}
-          onChange={e => setFormData(prev => ({
-            ...prev,
-            webinarLengthMinutes: parseInt(e.target.value) || 60,
-          }))}
-          min={15}
-          max={180}
-          className="input-field w-32"
-        />
-      </div>
+          <AlertCircle className="w-3.5 h-3.5" />
+          Project name and client name are required to proceed
+        </div>
+      )}
     </div>
   );
 }
@@ -716,6 +787,242 @@ function InputsStep({ formData, setFormData }: StepProps) {
   );
 }
 
+function ConfigurationStep({ formData, setFormData }: StepProps) {
+  const DURATION_PRESETS = [30, 45, 60, 90, 120];
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-sm font-semibold mb-1 flex items-center gap-2" style={{ color: 'rgb(var(--text-primary))' }}>
+          <Thermometer className="w-4 h-4" style={{ color: 'rgb(var(--accent-primary))' }} />
+          Audience Temperature
+        </h3>
+        <p className="text-xs mb-4" style={{ color: 'rgb(var(--text-muted))' }}>
+          How familiar is your audience with the problem you solve?
+        </p>
+
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            {
+              value: 'cold',
+              label: 'Cold',
+              description: 'New to topic',
+              detail: 'Audience is unfamiliar with the problem or solution. More education needed.',
+              color: '--accent-secondary',
+            },
+            {
+              value: 'warm',
+              label: 'Warm',
+              description: 'Familiar',
+              detail: 'Audience knows the problem exists and is exploring solutions.',
+              color: '--warning',
+            },
+            {
+              value: 'hot',
+              label: 'Hot',
+              description: 'Ready to buy',
+              detail: 'Audience is actively seeking your specific solution. Less convincing needed.',
+              color: '--error',
+            },
+          ].map((option) => (
+            <button
+              key={option.value}
+              onClick={() => setFormData(prev => ({
+                ...prev,
+                audienceTemperature: option.value as 'cold' | 'warm' | 'hot',
+              }))}
+              className="p-4 rounded-xl text-left transition-all"
+              style={{
+                background: formData.audienceTemperature === option.value
+                  ? `rgb(var(${option.color}) / 0.1)`
+                  : 'rgb(var(--surface-base))',
+                border: formData.audienceTemperature === option.value
+                  ? `2px solid rgb(var(${option.color}))`
+                  : '1px solid rgb(var(--border-default))',
+              }}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <div
+                  className="w-3 h-3 rounded-full"
+                  style={{ background: `rgb(var(${option.color}))` }}
+                />
+                <span className="font-semibold text-sm" style={{ color: 'rgb(var(--text-primary))' }}>
+                  {option.label}
+                </span>
+              </div>
+              <p className="text-xs font-medium mb-1" style={{ color: 'rgb(var(--text-secondary))' }}>
+                {option.description}
+              </p>
+              <p className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+                {option.detail}
+              </p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <h3 className="text-sm font-semibold mb-1 flex items-center gap-2" style={{ color: 'rgb(var(--text-primary))' }}>
+          <Target className="w-4 h-4" style={{ color: 'rgb(var(--accent-primary))' }} />
+          Call to Action Mode
+        </h3>
+        <p className="text-xs mb-4" style={{ color: 'rgb(var(--text-muted))' }}>
+          What action should viewers take after the webinar?
+        </p>
+
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            {
+              value: 'book_call',
+              label: 'Book a Call',
+              description: 'Schedule a discovery or sales call',
+              detail: 'Best for high-ticket offers, services, or complex solutions requiring consultation.',
+            },
+            {
+              value: 'buy_now',
+              label: 'Buy Now',
+              description: 'Direct purchase or sign-up',
+              detail: 'Best for lower-ticket products, courses, or offers with clear pricing.',
+            },
+          ].map((option) => (
+            <button
+              key={option.value}
+              onClick={() => setFormData(prev => ({
+                ...prev,
+                ctaMode: option.value as 'book_call' | 'buy_now',
+              }))}
+              className="p-4 rounded-xl text-left transition-all"
+              style={{
+                background: formData.ctaMode === option.value
+                  ? 'rgb(var(--accent-primary) / 0.1)'
+                  : 'rgb(var(--surface-base))',
+                border: formData.ctaMode === option.value
+                  ? '2px solid rgb(var(--accent-primary))'
+                  : '1px solid rgb(var(--border-default))',
+              }}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                {formData.ctaMode === option.value && (
+                  <Check className="w-4 h-4" style={{ color: 'rgb(var(--accent-primary))' }} />
+                )}
+                <span className="font-semibold text-sm" style={{ color: 'rgb(var(--text-primary))' }}>
+                  {option.label}
+                </span>
+              </div>
+              <p className="text-xs font-medium mb-1" style={{ color: 'rgb(var(--text-secondary))' }}>
+                {option.description}
+              </p>
+              <p className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+                {option.detail}
+              </p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <h3 className="text-sm font-semibold mb-1 flex items-center gap-2" style={{ color: 'rgb(var(--text-primary))' }}>
+          <Timer className="w-4 h-4" style={{ color: 'rgb(var(--accent-primary))' }} />
+          Webinar Duration
+        </h3>
+        <p className="text-xs mb-4" style={{ color: 'rgb(var(--text-muted))' }}>
+          Target length for your webinar. This affects the Framework 21 timeboxes.
+        </p>
+
+        <div className="flex items-center gap-2 mb-4">
+          {DURATION_PRESETS.map((preset) => (
+            <button
+              key={preset}
+              onClick={() => setFormData(prev => ({
+                ...prev,
+                webinarLengthMinutes: preset,
+              }))}
+              className="px-4 py-2 rounded-lg text-sm font-medium transition-all"
+              style={{
+                background: formData.webinarLengthMinutes === preset
+                  ? 'rgb(var(--accent-primary))'
+                  : 'rgb(var(--surface-base))',
+                color: formData.webinarLengthMinutes === preset
+                  ? 'white'
+                  : 'rgb(var(--text-secondary))',
+                border: formData.webinarLengthMinutes === preset
+                  ? 'none'
+                  : '1px solid rgb(var(--border-default))',
+              }}
+            >
+              {preset} min
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <label className="text-sm" style={{ color: 'rgb(var(--text-secondary))' }}>
+            Custom:
+          </label>
+          <input
+            type="number"
+            value={formData.webinarLengthMinutes}
+            onChange={e => setFormData(prev => ({
+              ...prev,
+              webinarLengthMinutes: Math.max(15, Math.min(180, parseInt(e.target.value) || 60)),
+            }))}
+            min={15}
+            max={180}
+            className="input-field w-24"
+          />
+          <span className="text-sm" style={{ color: 'rgb(var(--text-muted))' }}>minutes</span>
+        </div>
+
+        <div
+          className="mt-4 p-3 rounded-lg"
+          style={{
+            background: 'rgb(var(--surface-base))',
+            border: '1px solid rgb(var(--border-subtle))',
+          }}
+        >
+          <p className="text-xs font-medium mb-2" style={{ color: 'rgb(var(--text-secondary))' }}>
+            Phase Breakdown (7-7-7 Structure)
+          </p>
+          <div className="flex gap-1">
+            <div
+              className="h-2 rounded-l flex-1"
+              style={{ background: 'rgb(var(--accent-secondary))' }}
+              title="Beginning (7 blocks)"
+            />
+            <div
+              className="h-2 flex-1"
+              style={{ background: 'rgb(var(--accent-primary))' }}
+              title="Middle (7 blocks)"
+            />
+            <div
+              className="h-2 rounded-r flex-1"
+              style={{ background: 'rgb(var(--success))' }}
+              title="End (7 blocks)"
+            />
+          </div>
+          <div className="flex justify-between mt-1 text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+            <span>Beginning ({Math.round(formData.webinarLengthMinutes / 3)} min)</span>
+            <span>Middle ({Math.round(formData.webinarLengthMinutes / 3)} min)</span>
+            <span>End ({Math.round(formData.webinarLengthMinutes / 3)} min)</span>
+          </div>
+        </div>
+      </div>
+
+      <div
+        className="p-4 rounded-xl"
+        style={{
+          background: 'rgb(var(--accent-primary) / 0.05)',
+          border: '1px solid rgb(var(--accent-primary) / 0.1)',
+        }}
+      >
+        <p className="text-xs" style={{ color: 'rgb(var(--text-secondary))' }}>
+          These settings influence how all 8 deliverables are generated - from email tone to landing page urgency to the Run of Show timing.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function ConfirmStep({ formData }: { formData: ProjectFormData }) {
   const qualityResult = assessInputQuality(
     formData.buildTranscript,
@@ -727,46 +1034,90 @@ function ConfirmStep({ formData }: { formData: ProjectFormData }) {
     <div className="space-y-6">
       <InputQualityIndicator quality={qualityResult} showDetails={true} />
 
-      <div
-        className="p-4 rounded-xl"
-        style={{
-          background: 'rgb(var(--surface-base))',
-          border: '1px solid rgb(var(--border-default))',
-        }}
-      >
-        <h3
-          className="font-semibold mb-4"
-          style={{ color: 'rgb(var(--text-primary))' }}
+      <div className="grid grid-cols-2 gap-4">
+        <div
+          className="p-4 rounded-xl"
+          style={{
+            background: 'rgb(var(--surface-base))',
+            border: '1px solid rgb(var(--border-default))',
+          }}
         >
-          Project Summary
-        </h3>
+          <h3
+            className="font-semibold mb-3 flex items-center gap-2 text-sm"
+            style={{ color: 'rgb(var(--text-primary))' }}
+          >
+            <User className="w-4 h-4" style={{ color: 'rgb(var(--accent-primary))' }} />
+            Profile
+          </h3>
 
-        <dl className="space-y-3">
-          <div className="flex justify-between">
-            <dt style={{ color: 'rgb(var(--text-muted))' }}>Name</dt>
-            <dd className="font-medium" style={{ color: 'rgb(var(--text-primary))' }}>
-              {formData.title}
-            </dd>
-          </div>
-          <div className="flex justify-between">
-            <dt style={{ color: 'rgb(var(--text-muted))' }}>Audience</dt>
-            <dd className="font-medium capitalize" style={{ color: 'rgb(var(--text-primary))' }}>
-              {formData.audienceTemperature}
-            </dd>
-          </div>
-          <div className="flex justify-between">
-            <dt style={{ color: 'rgb(var(--text-muted))' }}>CTA</dt>
-            <dd className="font-medium" style={{ color: 'rgb(var(--text-primary))' }}>
-              {formData.ctaMode === 'book_call' ? 'Book a Call' : 'Buy Now'}
-            </dd>
-          </div>
-          <div className="flex justify-between">
-            <dt style={{ color: 'rgb(var(--text-muted))' }}>Duration</dt>
-            <dd className="font-medium" style={{ color: 'rgb(var(--text-primary))' }}>
-              {formData.webinarLengthMinutes} minutes
-            </dd>
-          </div>
-        </dl>
+          <dl className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <dt style={{ color: 'rgb(var(--text-muted))' }}>Project</dt>
+              <dd className="font-medium truncate max-w-[150px]" style={{ color: 'rgb(var(--text-primary))' }}>
+                {formData.title || '-'}
+              </dd>
+            </div>
+            <div className="flex justify-between">
+              <dt style={{ color: 'rgb(var(--text-muted))' }}>Client</dt>
+              <dd className="font-medium truncate max-w-[150px]" style={{ color: 'rgb(var(--text-primary))' }}>
+                {formData.clientName || '-'}
+              </dd>
+            </div>
+            {formData.speakerName && (
+              <div className="flex justify-between">
+                <dt style={{ color: 'rgb(var(--text-muted))' }}>Speaker</dt>
+                <dd className="font-medium truncate max-w-[150px]" style={{ color: 'rgb(var(--text-primary))' }}>
+                  {formData.speakerName}
+                </dd>
+              </div>
+            )}
+            {formData.companyName && (
+              <div className="flex justify-between">
+                <dt style={{ color: 'rgb(var(--text-muted))' }}>Company</dt>
+                <dd className="font-medium truncate max-w-[150px]" style={{ color: 'rgb(var(--text-primary))' }}>
+                  {formData.companyName}
+                </dd>
+              </div>
+            )}
+          </dl>
+        </div>
+
+        <div
+          className="p-4 rounded-xl"
+          style={{
+            background: 'rgb(var(--surface-base))',
+            border: '1px solid rgb(var(--border-default))',
+          }}
+        >
+          <h3
+            className="font-semibold mb-3 flex items-center gap-2 text-sm"
+            style={{ color: 'rgb(var(--text-primary))' }}
+          >
+            <Sliders className="w-4 h-4" style={{ color: 'rgb(var(--accent-primary))' }} />
+            Configuration
+          </h3>
+
+          <dl className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <dt style={{ color: 'rgb(var(--text-muted))' }}>Audience</dt>
+              <dd className="font-medium capitalize" style={{ color: 'rgb(var(--text-primary))' }}>
+                {formData.audienceTemperature}
+              </dd>
+            </div>
+            <div className="flex justify-between">
+              <dt style={{ color: 'rgb(var(--text-muted))' }}>CTA</dt>
+              <dd className="font-medium" style={{ color: 'rgb(var(--text-primary))' }}>
+                {formData.ctaMode === 'book_call' ? 'Book a Call' : 'Buy Now'}
+              </dd>
+            </div>
+            <div className="flex justify-between">
+              <dt style={{ color: 'rgb(var(--text-muted))' }}>Duration</dt>
+              <dd className="font-medium" style={{ color: 'rgb(var(--text-primary))' }}>
+                {formData.webinarLengthMinutes} min
+              </dd>
+            </div>
+          </dl>
+        </div>
       </div>
 
       {qualityResult.risks.length > 0 && (
