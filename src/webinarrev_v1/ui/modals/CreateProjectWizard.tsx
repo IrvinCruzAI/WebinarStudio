@@ -83,6 +83,48 @@ export function CreateProjectWizard({ isOpen, onClose, onSubmit }: CreateProject
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  const checkForExistingDrafts = async () => {
+    try {
+      const drafts = await listAllDrafts();
+      if (drafts.length > 0) {
+        setExistingDrafts(drafts);
+        setShowResumeDraft(true);
+      }
+    } catch (error) {
+      console.error('Failed to load drafts:', error);
+    }
+  };
+
+  const handleAutoSave = useCallback(async () => {
+    setSaveStatus('saving');
+    try {
+      const draftData: DraftData = {
+        draft_id: draftId,
+        title: formData.title,
+        client_name: formData.clientName,
+        speaker_name: formData.speakerName,
+        company_name: formData.companyName,
+        contact_email: formData.contactEmail,
+        build_transcript: formData.buildTranscript,
+        intake_transcript: formData.intakeTranscript,
+        operator_notes: formData.operatorNotes,
+        cta_mode: formData.ctaMode,
+        audience_temperature: formData.audienceTemperature,
+        webinar_length_minutes: formData.webinarLengthMinutes,
+        created_at: Date.now(),
+        updated_at: Date.now(),
+      };
+      await saveDraft(draftData);
+      setSaveStatus('saved');
+      setSaveError(null);
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    } catch (error) {
+      console.error('Failed to auto-save draft:', error);
+      setSaveStatus('error');
+      setSaveError(error instanceof Error ? error.message : 'Failed to save draft');
+    }
+  }, [draftId, formData]);
+
   useEffect(() => {
     if (isOpen) {
       checkForExistingDrafts();
@@ -125,48 +167,6 @@ export function CreateProjectWizard({ isOpen, onClose, onSubmit }: CreateProject
       }
     };
   }, [formData, isOpen, handleAutoSave]);
-
-  const checkForExistingDrafts = async () => {
-    try {
-      const drafts = await listAllDrafts();
-      if (drafts.length > 0) {
-        setExistingDrafts(drafts);
-        setShowResumeDraft(true);
-      }
-    } catch (error) {
-      console.error('Failed to load drafts:', error);
-    }
-  };
-
-  const handleAutoSave = useCallback(async () => {
-    setSaveStatus('saving');
-    try {
-      const draftData: DraftData = {
-        draft_id: draftId,
-        title: formData.title,
-        client_name: formData.clientName,
-        speaker_name: formData.speakerName,
-        company_name: formData.companyName,
-        contact_email: formData.contactEmail,
-        build_transcript: formData.buildTranscript,
-        intake_transcript: formData.intakeTranscript,
-        operator_notes: formData.operatorNotes,
-        cta_mode: formData.ctaMode,
-        audience_temperature: formData.audienceTemperature,
-        webinar_length_minutes: formData.webinarLengthMinutes,
-        created_at: Date.now(),
-        updated_at: Date.now(),
-      };
-      await saveDraft(draftData);
-      setSaveStatus('saved');
-      setSaveError(null);
-      setTimeout(() => setSaveStatus('idle'), 3000);
-    } catch (error) {
-      console.error('Failed to auto-save draft:', error);
-      setSaveStatus('error');
-      setSaveError(error instanceof Error ? error.message : 'Failed to save draft');
-    }
-  }, [draftId, formData]);
 
   const handleResumeDraft = async (draft: DraftData) => {
     setFormData({

@@ -250,7 +250,7 @@ export function AppShell({
             </div>
           ) : (
             <div className="flex items-center justify-between">
-              <button onClick={toggleTheme} className="btn-ghost text-sm">
+              <button key="theme-toggle" onClick={toggleTheme} className="btn-ghost text-sm">
                 {theme === 'dark' ? (
                   <>
                     <Sun className="w-4 h-4" />
@@ -263,7 +263,7 @@ export function AppShell({
                   </>
                 )}
               </button>
-              <button className="btn-ghost p-2">
+              <button key="settings-btn" className="btn-ghost p-2">
                 <Settings className="w-4 h-4" />
               </button>
             </div>
