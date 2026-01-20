@@ -74,7 +74,7 @@ export class CancellableAIClient {
             { role: 'user', content: userPrompt },
           ],
           temperature: options.temperature || 0.7,
-          max_tokens: options.maxTokens || 4000,
+          max_tokens: options.maxTokens || 8000,
         }),
         signal,
       });
@@ -115,17 +115,18 @@ export class CancellableAIClient {
         throw new APIConnectionError(`AI API error: ${response.status} ${errorText}`, response.status);
       }
 
+      const responseText = await response.text();
       let data: unknown;
       try {
-        data = await response.json();
+        data = JSON.parse(responseText);
       } catch (jsonError) {
-        const bodyText = await response.text().catch(() => 'Unable to read response body');
         safeError('Failed to parse response JSON', jsonError, {
-          bodyLength: bodyText.length,
+          bodyLength: responseText.length,
+          bodyPreview: responseText.slice(0, 500),
           contentType: response.headers.get('content-type'),
         });
         throw new APIConnectionError(
-          'Received invalid JSON from AI provider. The response may be incomplete or corrupted.',
+          `Received invalid JSON from AI provider (${responseText.length} chars). The response may be incomplete or corrupted.`,
           response.status
         );
       }

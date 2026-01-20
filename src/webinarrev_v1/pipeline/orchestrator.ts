@@ -288,11 +288,19 @@ export class PipelineOrchestrator {
     const systemPrompt = buildSystemPrompt(deliverableId);
     const userPrompt = buildUserPrompt(deliverableId, enrichedContext);
 
+    const maxTokensForDeliverable: Record<string, number> = {
+      WR2: 12000,
+      WR4: 10000,
+      WR6: 10000,
+    };
+
     let rawOutput: unknown;
 
     try {
       rawOutput = await this.queue.enqueue(() =>
-        this.aiClient.call(systemPrompt, userPrompt)
+        this.aiClient.call(systemPrompt, userPrompt, {
+          maxTokens: maxTokensForDeliverable[deliverableId] || 8000,
+        })
       );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
