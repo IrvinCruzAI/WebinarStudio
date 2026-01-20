@@ -45,9 +45,10 @@ export interface ProjectStoreState {
   }>;
   isLoading: boolean;
   isPipelineRunning: boolean;
-  pipelineProgress: PipelineProgress | null;
+  pipelineProgress: PipelineProgress[];
   error: string | null;
   pipelineError: PipelineError | null;
+  orchestrator: PipelineOrchestrator | null;
 }
 
 export function useProjectStore() {
@@ -57,9 +58,10 @@ export function useProjectStore() {
     artifacts: new Map(),
     isLoading: true,
     isPipelineRunning: false,
-    pipelineProgress: null,
+    pipelineProgress: [],
     error: null,
     pipelineError: null,
+    orchestrator: null,
   });
 
   const clearError = useCallback(() => {
@@ -118,7 +120,7 @@ export function useProjectStore() {
   }, []);
 
   const selectProject = useCallback(async (projectId: string | null) => {
-    setState((s) => ({ ...s, selectedProjectId: projectId, artifacts: new Map(), pipelineError: null }));
+    setState((s) => ({ ...s, selectedProjectId: projectId, artifacts: new Map(), pipelineError: null, pipelineProgress: [] }));
     if (projectId) {
       await loadProjectArtifacts(projectId);
     }
@@ -156,20 +158,24 @@ export function useProjectStore() {
 
     updateProject(state.selectedProjectId, { run_id: runId });
 
+    const orchestrator = new PipelineOrchestrator((progress) => {
+      setState((s) => ({
+        ...s,
+        pipelineProgress: [...s.pipelineProgress.filter(p => p.deliverableId !== progress.deliverableId), progress],
+      }));
+    });
+
     setState((s) => ({
       ...s,
       isPipelineRunning: true,
-      pipelineProgress: null,
+      pipelineProgress: [],
       error: null,
       pipelineError: null,
+      orchestrator,
     }));
 
     updateProjectStatus(state.selectedProjectId, 'generating');
     await loadProjects();
-
-    const orchestrator = new PipelineOrchestrator((progress) => {
-      setState((s) => ({ ...s, pipelineProgress: progress }));
-    });
 
     try {
       await orchestrator.runPipeline(state.selectedProjectId, runId);
@@ -210,7 +216,7 @@ export function useProjectStore() {
       await loadProjects();
       await loadProjectArtifacts(state.selectedProjectId);
     } finally {
-      setState((s) => ({ ...s, isPipelineRunning: false, pipelineProgress: null }));
+      setState((s) => ({ ...s, isPipelineRunning: false, orchestrator: null }));
     }
   }, [state.selectedProjectId, loadProjects, loadProjectArtifacts]);
 
@@ -327,9 +333,74 @@ export function useProjectStore() {
     }
   }, [state.artifacts, revalidateDeliverable]);
 
-  const regenerateDeliverable = useCallback(async (deliverableId: DeliverableId) => {
-    console.log('Regenerate not yet implemented for:', deliverableId);
-  }, []);
+  const regenerateDeliverable = useCallback(async (deliverableId: DeliverableId, cascade: boolean) => {
+    if (!state.selectedProjectId) return;
+
+    const project = getProject(state.selectedProjectId);
+    if (!project || !project.run_id) return;
+
+    const orchestrator = new PipelineOrchestrator((progress) => {
+      setState((s) => ({
+        ...s,
+        pipelineProgress: [...s.pipelineProgress.filter(p => p.deliverableId !== progress.deliverableId), progress],
+      }));
+    });
+
+    setState((s) => ({
+      ...s,
+      isPipelineRunning: true,
+      pipelineProgress: [],
+      error: null,
+      pipelineError: null,
+      orchestrator,
+    }));
+
+    try {
+      await orchestrator.runSelectiveRegeneration(
+        state.selectedProjectId,
+        project.run_id,
+        deliverableId,
+        cascade
+      );
+      await loadProjects();
+      await loadProjectArtifacts(state.selectedProjectId);
+    } catch (error) {
+      console.error('Selective regeneration failed:', error);
+
+      let pipelineError: PipelineError;
+
+      if (error instanceof PipelineValidationError) {
+        pipelineError = {
+          message: error.message,
+          deliverableId: error.deliverableId,
+          details: error.validationErrors,
+          errorType: error.errorType,
+        };
+      } else {
+        pipelineError = {
+          message: error instanceof Error ? error.message : 'Regeneration failed',
+          errorType: 'unknown',
+        };
+      }
+
+      setState((s) => ({
+        ...s,
+        error: pipelineError.message,
+        pipelineError,
+      }));
+
+      await loadProjects();
+      await loadProjectArtifacts(state.selectedProjectId);
+    } finally {
+      setState((s) => ({ ...s, isPipelineRunning: false, orchestrator: null }));
+    }
+  }, [state.selectedProjectId, loadProjects, loadProjectArtifacts]);
+
+  const cancelPipeline = useCallback(() => {
+    if (state.orchestrator) {
+      state.orchestrator.cancel();
+    }
+  }, [state.orchestrator]);
 
   const exportDocx = useCallback(async (deliverableId: DeliverableId) => {
     const artifact = state.artifacts.get(deliverableId);
@@ -399,5 +470,6 @@ export function useProjectStore() {
     exportZip,
     removeProject,
     clearError,
+    cancelPipeline,
   };
 }

@@ -518,6 +518,190 @@ export class PipelineOrchestrator {
     return actions;
   }
 
+  async runSelectiveRegeneration(
+    projectId: string,
+    runId: string,
+    targetDeliverableId: DeliverableId,
+    cascade: boolean
+  ): Promise<void> {
+    this.cancelled = false;
+
+    try {
+      const project = getProject(projectId);
+      if (!project) {
+        throw new Error(`Project ${projectId} not found`);
+      }
+
+      const transcriptData = await readTranscript(projectId);
+      if (!transcriptData) {
+        throw new Error(`Transcript data not found for project ${projectId}`);
+      }
+
+      const context: PromptContext = {
+        buildTranscript: transcriptData.build_transcript,
+        intakeTranscript: transcriptData.intake_transcript,
+        operatorNotes: transcriptData.operator_notes,
+        settings: project.settings,
+      };
+
+      const affectedDeliverables = this.computeAffectedDeliverables(targetDeliverableId, cascade);
+
+      const dependencies = new Map<DeliverableId, unknown>();
+      const failedDeliverables = new Map<DeliverableId, string[]>();
+
+      const allDeliverableIds: DeliverableId[] = ['PREFLIGHT', 'WR1', 'WR2', 'WR3', 'WR4', 'WR5', 'WR6', 'WR7', 'WR8'];
+      for (const id of allDeliverableIds) {
+        if (!affectedDeliverables.has(id)) {
+          const existingArtifact = await this.loadExistingArtifact(projectId, runId, id);
+          if (existingArtifact) {
+            dependencies.set(id, existingArtifact);
+          }
+        }
+      }
+
+      const sortedAffected = Array.from(affectedDeliverables).sort((a, b) => {
+        const stageA = PIPELINE_STAGES.find(s => s.id === a);
+        const stageB = PIPELINE_STAGES.find(s => s.id === b);
+        return (stageA?.batch || 999) - (stageB?.batch || 999);
+      });
+
+      for (const deliverableId of sortedAffected) {
+        if (this.cancelled) {
+          throw new Error('Regeneration cancelled by user');
+        }
+
+        if (deliverableId === 'WR9') continue;
+        if (deliverableId === 'PREFLIGHT') continue;
+
+        const stage = PIPELINE_STAGES.find(s => s.id === deliverableId);
+        if (!stage) continue;
+
+        try {
+          this.reportProgress({
+            stage: `Stage ${stage.batch}`,
+            deliverableId,
+            status: 'generating',
+          });
+
+          const { content, normalizationLog } = await this.generateDeliverable(
+            deliverableId,
+            context,
+            dependencies,
+            stage.batch
+          );
+
+          dependencies.set(deliverableId, content);
+
+          this.reportProgress({
+            stage: `Stage ${stage.batch}`,
+            deliverableId,
+            status: 'validating',
+          });
+
+          const validationResult = await validateDeliverable(
+            deliverableId,
+            content,
+            dependencies
+          );
+
+          await atomicArtifactWrite(
+            projectId,
+            runId,
+            deliverableId,
+            content,
+            validationResult.ok,
+            normalizationLog
+          );
+
+          if (!validationResult.ok) {
+            failedDeliverables.set(deliverableId, validationResult.errors);
+            this.reportProgress({
+              stage: `Stage ${stage.batch}`,
+              deliverableId,
+              status: 'error',
+              error: `Validation failed: ${validationResult.errors[0]}`,
+              errorDetails: validationResult.errors,
+            });
+          } else {
+            this.reportProgress({
+              stage: `Stage ${stage.batch}`,
+              deliverableId,
+              status: 'complete',
+            });
+          }
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          const errorDetails = error instanceof z.ZodError
+            ? formatValidationErrors(error)
+            : [errorMessage];
+
+          failedDeliverables.set(deliverableId, errorDetails);
+
+          this.reportProgress({
+            stage: `Stage ${stage.batch}`,
+            deliverableId,
+            status: 'error',
+            error: errorMessage,
+            errorDetails,
+          });
+
+          console.error(`Error regenerating ${deliverableId}:`, error);
+        }
+      }
+
+      await this.generateWR9(projectId, runId, dependencies, failedDeliverables);
+
+      const currentStatus = project.status;
+      if (currentStatus === 'review' || currentStatus === 'ready' || currentStatus === 'failed') {
+        const finalStatus = failedDeliverables.size > 0 ? 'review' : 'ready';
+        updateProjectStatus(projectId, finalStatus);
+      }
+    } catch (error) {
+      console.error('Selective regeneration error:', error);
+      throw error;
+    }
+  }
+
+  private computeAffectedDeliverables(targetId: DeliverableId, cascade: boolean): Set<DeliverableId> {
+    const affected = new Set<DeliverableId>();
+
+    if (targetId === 'PREFLIGHT' || targetId === 'WR9') {
+      return affected;
+    }
+
+    affected.add(targetId);
+    affected.add('WR9');
+
+    if (cascade) {
+      const addDownstream = (id: DeliverableId) => {
+        for (const stage of PIPELINE_STAGES) {
+          if (stage.dependencies.includes(id) && !affected.has(stage.id as DeliverableId)) {
+            affected.add(stage.id as DeliverableId);
+            addDownstream(stage.id as DeliverableId);
+          }
+        }
+      };
+
+      addDownstream(targetId);
+    }
+
+    return affected;
+  }
+
+  private async loadExistingArtifact(
+    projectId: string,
+    runId: string,
+    deliverableId: DeliverableId
+  ): Promise<unknown | null> {
+    try {
+      const { readArtifact } = await import('../store/storageService');
+      const artifact = await readArtifact(projectId, runId, deliverableId);
+      return artifact?.content || null;
+    } catch {
+      return null;
+    }
+  }
+
   cancel(): void {
     this.cancelled = true;
     this.queue.cancel();

@@ -12,10 +12,14 @@ import {
   ChevronRight,
   Copy,
   Check,
+  ChevronDown,
+  Link,
+  FileQuestion,
 } from 'lucide-react';
 import type { DeliverableId, ValidationResult } from '../../contracts';
 import { DELIVERABLES } from '../../contracts';
 import { formatDateTime } from '../utils/formatters';
+import { formatErrorForDisplay } from '../utils/errorFormatting';
 
 interface DeliverablePanelProps {
   deliverableId: DeliverableId;
@@ -27,7 +31,8 @@ interface DeliverablePanelProps {
   isStale?: boolean;
   onEdit: (field: string, value: unknown) => void;
   onRevalidate: () => Promise<void>;
-  onRegenerate: () => Promise<void>;
+  onRegenerate: (cascade: boolean) => Promise<void>;
+  isRunning?: boolean;
 }
 
 function JsonViewer({
@@ -231,10 +236,12 @@ export default function DeliverablePanel({
   onEdit,
   onRevalidate,
   onRegenerate,
+  isRunning,
 }: DeliverablePanelProps) {
   const [isRevalidating, setIsRevalidating] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showRegenerateMenu, setShowRegenerateMenu] = useState(false);
 
   const meta = DELIVERABLES[deliverableId];
   const hasErrors = validationResult && !validationResult.ok;
@@ -248,10 +255,11 @@ export default function DeliverablePanel({
     }
   }
 
-  async function handleRegenerate() {
+  async function handleRegenerate(cascade: boolean) {
     setIsRegenerating(true);
+    setShowRegenerateMenu(false);
     try {
-      await onRegenerate();
+      await onRegenerate(cascade);
     } finally {
       setIsRegenerating(false);
     }
@@ -350,7 +358,7 @@ export default function DeliverablePanel({
             </button>
             <button
               onClick={handleRevalidate}
-              disabled={isRevalidating}
+              disabled={isRevalidating || isRunning}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors disabled:opacity-50"
               style={{ color: 'rgb(var(--text-secondary))' }}
             >
@@ -359,21 +367,57 @@ export default function DeliverablePanel({
               />
               Revalidate
             </button>
-            <button
-              onClick={handleRegenerate}
-              disabled={isRegenerating}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors disabled:opacity-50"
-              style={{
-                background: 'rgb(var(--accent-primary) / 0.1)',
-                color: 'rgb(var(--accent-primary))',
-                border: '1px solid rgb(var(--accent-primary) / 0.3)',
-              }}
-            >
-              <RefreshCw
-                className={`w-4 h-4 ${isRegenerating ? 'animate-spin' : ''}`}
-              />
-              Regenerate
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowRegenerateMenu(!showRegenerateMenu)}
+                disabled={isRegenerating || isRunning || deliverableId === 'PREFLIGHT' || deliverableId === 'WR9'}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors disabled:opacity-50"
+                style={{
+                  background: 'rgb(var(--accent-primary) / 0.1)',
+                  color: 'rgb(var(--accent-primary))',
+                  border: '1px solid rgb(var(--accent-primary) / 0.3)',
+                }}
+              >
+                <RefreshCw
+                  className={`w-4 h-4 ${isRegenerating ? 'animate-spin' : ''}`}
+                />
+                Regenerate
+                <ChevronDown className="w-3 h-3" />
+              </button>
+              {showRegenerateMenu && (
+                <div
+                  className="absolute right-0 mt-1 w-64 rounded-lg shadow-lg overflow-hidden z-10"
+                  style={{
+                    background: 'rgb(var(--surface-elevated))',
+                    border: '1px solid rgb(var(--border-default))',
+                  }}
+                >
+                  <button
+                    onClick={() => handleRegenerate(false)}
+                    className="w-full px-3 py-2 text-left text-sm transition-colors"
+                    style={{
+                      color: 'rgb(var(--text-primary))',
+                      borderBottom: '1px solid rgb(var(--border-default))',
+                    }}
+                  >
+                    <div className="font-medium">Regenerate This Only</div>
+                    <div className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+                      Only regenerate {deliverableId}, keep others unchanged
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => handleRegenerate(true)}
+                    className="w-full px-3 py-2 text-left text-sm transition-colors"
+                    style={{ color: 'rgb(var(--text-primary))' }}
+                  >
+                    <div className="font-medium">Regenerate This + Downstream</div>
+                    <div className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+                      Regenerate {deliverableId} and all dependents
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -403,27 +447,60 @@ export default function DeliverablePanel({
 
       {hasErrors && validationResult && (
         <div
-          className="p-4"
+          className="p-4 space-y-3"
           style={{
             background: 'rgb(var(--error) / 0.05)',
             borderBottom: '1px solid rgb(var(--error) / 0.2)',
           }}
         >
-          <h4 className="text-sm font-medium mb-2" style={{ color: 'rgb(var(--error))' }}>
-            Validation Errors
+          <h4 className="text-sm font-medium" style={{ color: 'rgb(var(--error))' }}>
+            Validation Errors ({validationResult.errors.length})
           </h4>
-          <ul className="space-y-1">
-            {validationResult.errors.map((error, index) => (
-              <li
-                key={index}
-                className="text-xs flex items-start gap-2"
-                style={{ color: 'rgb(var(--error) / 0.8)' }}
-              >
-                <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                {error}
-              </li>
-            ))}
-          </ul>
+          <div className="space-y-2">
+            {validationResult.errors.map((error, index) => {
+              const formatted = formatErrorForDisplay(error);
+              const ErrorIcon = formatted.icon === 'crosslink' ? Link :
+                               formatted.icon === 'placeholder' ? FileQuestion :
+                               AlertTriangle;
+
+              return (
+                <div
+                  key={index}
+                  className="p-2 rounded"
+                  style={{
+                    background: 'rgb(var(--surface-base))',
+                    border: '1px solid rgb(var(--error) / 0.2)',
+                  }}
+                >
+                  <div className="flex items-start gap-2">
+                    <ErrorIcon
+                      className="w-4 h-4 mt-0.5 flex-shrink-0"
+                      style={{ color: 'rgb(var(--error))' }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-medium" style={{ color: 'rgb(var(--error))' }}>
+                        {formatted.title}
+                      </div>
+                      <div className="text-xs mt-1" style={{ color: 'rgb(var(--text-secondary))' }}>
+                        {formatted.description}
+                      </div>
+                      {formatted.hint && (
+                        <div
+                          className="text-xs mt-1 px-2 py-1 rounded"
+                          style={{
+                            background: 'rgb(var(--accent-primary) / 0.1)',
+                            color: 'rgb(var(--accent-primary))',
+                          }}
+                        >
+                          Hint: {formatted.hint}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

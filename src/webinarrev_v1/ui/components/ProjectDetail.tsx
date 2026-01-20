@@ -27,6 +27,10 @@ import ProofVault from './ProofVault';
 import DeliverablePanel from './DeliverablePanel';
 import ExportPanel from './ExportPanel';
 import OperatorDebugPanel from './OperatorDebugPanel';
+import PipelineProgressPanel from './PipelineProgressPanel';
+import RegenerationConfirmModal from './RegenerationConfirmModal';
+import { checkStaleness } from '../../utils/stalenessDetection';
+import { PipelineProgress } from '../../pipeline/orchestrator';
 
 interface ProjectDetailProps {
   project: ProjectMetadata;
@@ -35,10 +39,12 @@ interface ProjectDetailProps {
   onRunPipeline: () => Promise<void>;
   onEditDeliverable: (deliverableId: DeliverableId, field: string, value: unknown) => Promise<void>;
   onRevalidateDeliverable: (deliverableId: DeliverableId) => Promise<ValidationResult>;
-  onRegenerateDeliverable: (deliverableId: DeliverableId) => Promise<void>;
+  onRegenerateDeliverable: (deliverableId: DeliverableId, cascade: boolean) => Promise<void>;
   onExportDocx: (deliverableId: DeliverableId) => Promise<void>;
   onExportZip: () => Promise<void>;
+  onCancelPipeline: () => void;
   isRunning?: boolean;
+  pipelineProgress: PipelineProgress[];
 }
 
 type TabId = 'framework' | 'proofs' | 'deliverables' | 'export';
@@ -107,13 +113,16 @@ export default function ProjectDetail({
   onRegenerateDeliverable,
   onExportDocx,
   onExportZip,
+  onCancelPipeline,
   isRunning,
+  pipelineProgress,
 }: ProjectDetailProps) {
   const [activeTab, setActiveTab] = useState<TabId>('framework');
   const [selectedDeliverableId, setSelectedDeliverableId] = useState<DeliverableId | null>(null);
   const [selectedBlockId, setSelectedBlockId] = useState<BlockId | null>(null);
   const [validationResults, setValidationResults] = useState<Map<DeliverableId, ValidationResult>>(new Map());
   const [debugPanelVisible, setDebugPanelVisible] = useState(false);
+  const [regenerationModal, setRegenerationModal] = useState<{ deliverableId: DeliverableId; cascade: boolean } | null>(null);
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -175,6 +184,74 @@ export default function ProjectDetail({
     return result;
   }
 
+  function handleRegenerateRequest(deliverableId: DeliverableId, cascade: boolean) {
+    setRegenerationModal({ deliverableId, cascade });
+  }
+
+  async function handleRegenerateConfirm() {
+    if (!regenerationModal) return;
+    setRegenerationModal(null);
+    await onRegenerateDeliverable(regenerationModal.deliverableId, regenerationModal.cascade);
+  }
+
+  function computeAffectedDeliverables(targetId: DeliverableId, cascade: boolean): DeliverableId[] {
+    const affected: DeliverableId[] = [targetId];
+
+    if (!cascade) {
+      affected.push('WR9');
+      return affected;
+    }
+
+    const DEPENDENCY_MAP: Record<DeliverableId, DeliverableId[]> = {
+      'PREFLIGHT': [],
+      'WR1': [],
+      'WR2': [],
+      'WR3': [],
+      'WR4': [],
+      'WR5': [],
+      'WR6': [],
+      'WR7': [],
+      'WR8': [],
+      'WR9': [],
+    };
+
+    DEPENDENCY_MAP['WR1'] = [];
+    DEPENDENCY_MAP['WR2'] = [];
+    DEPENDENCY_MAP['WR3'] = ['WR8'];
+    DEPENDENCY_MAP['WR4'] = [];
+    DEPENDENCY_MAP['WR5'] = [];
+    DEPENDENCY_MAP['WR6'] = [];
+    DEPENDENCY_MAP['WR7'] = [];
+    DEPENDENCY_MAP['WR8'] = [];
+
+    const addDownstream = (id: DeliverableId) => {
+      const downstream = DEPENDENCY_MAP[id] || [];
+      for (const depId of downstream) {
+        if (!affected.includes(depId)) {
+          affected.push(depId);
+          addDownstream(depId);
+        }
+      }
+    };
+
+    if (targetId === 'WR1') {
+      affected.push('WR2', 'WR3', 'WR4', 'WR5', 'WR6', 'WR7', 'WR8');
+    } else if (targetId === 'WR2') {
+      affected.push('WR3', 'WR4', 'WR5', 'WR6', 'WR7', 'WR8');
+    } else {
+      addDownstream(targetId);
+    }
+
+    affected.push('WR9');
+    return affected;
+  }
+
+  const selectedDeliverableStaleness = selectedDeliverableId
+    ? checkStaleness(selectedDeliverableId, artifacts)
+    : null;
+
+  const hasProgressErrors = pipelineProgress.some(p => p.status === 'error');
+
   const tabs: Array<{ id: TabId; label: string; icon: typeof LayoutGrid }> = [
     { id: 'framework', label: 'Framework', icon: LayoutGrid },
     { id: 'proofs', label: 'ProofVault', icon: Shield },
@@ -184,6 +261,15 @@ export default function ProjectDetail({
 
   return (
     <div className="space-y-6">
+      {(isRunning || hasProgressErrors) && (
+        <PipelineProgressPanel
+          progress={pipelineProgress}
+          isRunning={isRunning || false}
+          onCancel={onCancelPipeline}
+          hasErrors={hasProgressErrors}
+        />
+      )}
+
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button
@@ -321,14 +407,13 @@ export default function ProjectDetail({
                 generatedAt={artifacts.get(selectedDeliverableId)!.generated_at}
                 editedAt={artifacts.get(selectedDeliverableId)!.edited_at}
                 validationResult={validationResults.get(selectedDeliverableId)}
-                isStale={
-                  selectedDeliverableId === 'WR2' && staleBlocks.size > 0
-                }
+                isStale={selectedDeliverableStaleness?.isStale}
                 onEdit={(field, value) =>
                   onEditDeliverable(selectedDeliverableId, field, value)
                 }
                 onRevalidate={() => handleRevalidate(selectedDeliverableId)}
-                onRegenerate={() => onRegenerateDeliverable(selectedDeliverableId)}
+                onRegenerate={(cascade) => handleRegenerateRequest(selectedDeliverableId, cascade)}
+                isRunning={isRunning}
               />
             )}
 
@@ -362,6 +447,20 @@ export default function ProjectDetail({
           exportEligibility={debugEligibility}
           artifacts={artifacts}
           isVisible={debugPanelVisible}
+        />
+      )}
+
+      {regenerationModal && (
+        <RegenerationConfirmModal
+          targetDeliverableId={regenerationModal.deliverableId}
+          cascade={regenerationModal.cascade}
+          affectedDeliverables={computeAffectedDeliverables(
+            regenerationModal.deliverableId,
+            regenerationModal.cascade
+          )}
+          artifacts={artifacts}
+          onConfirm={handleRegenerateConfirm}
+          onCancel={() => setRegenerationModal(null)}
         />
       )}
     </div>
