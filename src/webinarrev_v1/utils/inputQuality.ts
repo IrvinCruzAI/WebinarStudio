@@ -226,50 +226,6 @@ Unique Selling Points:
   },
 ];
 
-export interface MissingSettingsResult {
-  missingSettings: string[];
-  hasMissingSettings: boolean;
-}
-
-export function getMissingRecommendedSettings(
-  operatorSettings: {
-    sender_name?: string;
-    sender_email?: string;
-    reply_to_email?: string;
-    primary_cta_link?: string;
-    registration_link?: string;
-  } | undefined,
-  ctaMode: string
-): MissingSettingsResult {
-  const missing: string[] = [];
-
-  if (!operatorSettings?.sender_name) {
-    missing.push('Sender Name (for emails)');
-  }
-  if (!operatorSettings?.sender_email) {
-    missing.push('Sender Email (for emails)');
-  }
-
-  if (ctaMode === 'book_call' || ctaMode === 'hybrid') {
-    if (!operatorSettings?.primary_cta_link) {
-      missing.push('Primary CTA Link (booking page)');
-    }
-  }
-
-  if (ctaMode === 'buy_now' || ctaMode === 'hybrid') {
-    if (!operatorSettings?.primary_cta_link) {
-      missing.push('Primary CTA Link (purchase page)');
-    }
-    if (!operatorSettings?.registration_link) {
-      missing.push('Registration Link');
-    }
-  }
-
-  return {
-    missingSettings: missing,
-    hasMissingSettings: missing.length > 0,
-  };
-}
 
 export const OPERATOR_NOTES_EXAMPLES: GoodExample[] = [
   {

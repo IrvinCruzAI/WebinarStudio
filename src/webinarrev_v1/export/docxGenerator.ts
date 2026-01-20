@@ -292,13 +292,19 @@ export async function generateWR3Docx(data: WR3, projectTitle: string): Promise<
 
 export async function generateWR4Docx(data: WR4, projectTitle: string): Promise<void> {
   const sections: Paragraph[] = [
-    createTitle(`${projectTitle} - Email Campaign`),
+    createTitle(`${projectTitle} - Email Campaign Copy`),
     new Paragraph({ children: [] }),
-    createHeading('Send Rules', HeadingLevel.HEADING_1),
-    createBodyText(`From: ${data.send_rules.from_name_placeholder}`),
-    createBodyText(`Email: ${data.send_rules.from_email_placeholder}`),
-    createBodyText(`Reply To: ${data.send_rules.reply_to_placeholder}`),
-    new Paragraph({ children: [] }),
+    new Paragraph({
+      children: [
+        new TextRun({
+          text: 'Paste this email copy into your email platform (Mailchimp, ConvertKit, ActiveCampaign, etc). Configure sender information and button links in your email tool.',
+          size: 22,
+          color: COLORS.muted,
+          italics: true,
+        }),
+      ],
+      spacing: { after: 400 },
+    }),
   ];
 
   data.emails.forEach((email, index) => {
@@ -311,9 +317,8 @@ export async function generateWR4Docx(data: WR4, projectTitle: string): Promise<
     sections.push(createBodyText(email.preview_text));
     sections.push(createHeading('Body', HeadingLevel.HEADING_2));
     sections.push(createBodyText(email.body_markdown));
-    sections.push(createHeading('CTA', HeadingLevel.HEADING_2));
-    sections.push(createBodyText(`Button: ${email.primary_cta_label}`));
-    sections.push(createBodyText(`Link: ${email.primary_cta_link_placeholder}`));
+    sections.push(createHeading('CTA Button Label', HeadingLevel.HEADING_2));
+    sections.push(createBodyText(email.primary_cta_label));
     sections.push(new Paragraph({ children: [] }));
   });
 

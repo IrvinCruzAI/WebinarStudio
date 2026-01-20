@@ -91,8 +91,7 @@ qa: { assumptions: [], placeholders: [], claims_requiring_proof: [] }`,
 }`,
     WR4: `email_id format: E01, E02, E03, E04, E05, E06, E07, E08, E09, E10 (MUST use two digits with leading zero)
 8-10 emails required
-Each email: { email_id, timing, subject, preview_text, body_markdown, primary_cta_label, primary_cta_link_placeholder }
-send_rules: { from_name_placeholder, from_email_placeholder, reply_to_placeholder }
+Each email: { email_id, timing, subject, preview_text, body_markdown, primary_cta_label }
 qa: { assumptions: [], placeholders: [], claims_requiring_proof: [] }`,
     WR5: `linkedin_posts: 3-8 posts, social_id MUST be S01, S02, S03, S04, S05, S06, S07, or S08
 x_posts: 2-6 posts, social_id MUST be S09, S10, S11, S12, S13, or S14
@@ -317,30 +316,31 @@ CRITICAL:
 - proof_blocks type MUST be: "testimonial", "metric", or "case_study"
 - bullets array MUST have 3-7 items`,
 
-    WR4: (ctx) => `Generate email campaign sequence.
+    WR4: (ctx) => `Generate email campaign copy for marketing automation.
 
 WR1 DATA:
 ${JSON.stringify(ctx.dependencies?.WR1 || {}, null, 2).slice(0, 2000)}
-${buildOperatorSettingsContext(ctx.settings.operator)}
+
 CRITICAL: email_id MUST use two-digit format with leading zero: E01, E02, E03, E04, E05, E06, E07, E08, E09, E10
 NOT: E1, E2, E3... - single digits will cause validation failure!
 
+IMPORTANT: This is COPY GENERATION ONLY. Users will paste this into their own email platform (Mailchimp, ConvertKit, etc).
+- DO NOT generate placeholder text for sender names, sender emails, or reply-to addresses
+- DO NOT generate link placeholders for CTAs
+- FOCUS on compelling email copy: subject lines, preview text, body content, and CTA button labels
+- Write body_markdown with natural CTA placements using clear markers like [BUTTON: Book Your Spot]
+- Optimize for conversion: strong subject lines, engaging preview text, value-driven body copy
+
 Return JSON with EXACTLY this structure:
 {
-  "send_rules": {
-    "from_name_placeholder": "from_name_placeholder",
-    "from_email_placeholder": "from_email_placeholder",
-    "reply_to_placeholder": "reply_to_placeholder"
-  },
   "emails": [
     {
       "email_id": "E01",
       "timing": "T-7 days",
-      "subject": "Subject line here",
-      "preview_text": "Preview text here",
-      "body_markdown": "Email body in markdown format",
-      "primary_cta_label": "Register Now",
-      "primary_cta_link_placeholder": "primary_cta_link_placeholder"
+      "subject": "Compelling subject line optimized for open rates",
+      "preview_text": "Engaging preview text that complements the subject",
+      "body_markdown": "Email body in markdown format with natural CTA placement",
+      "primary_cta_label": "Register Now"
     },
     {
       "email_id": "E02",
@@ -360,8 +360,14 @@ Return JSON with EXACTLY this structure:
   }
 }
 
+COPY STRATEGY:
+- E01-E02: Awareness and value proposition
+- E03-E05: Education and proof points
+- E06-E07: Urgency and scarcity
+- E08-E10: Last chance reminders (if needed)
+
 Generate 8-10 emails with IDs E01 through E08/E09/E10.
-Each email MUST have ALL fields: email_id, timing, subject, preview_text, body_markdown, primary_cta_label, primary_cta_link_placeholder`,
+Each email MUST have ALL fields: email_id, timing, subject, preview_text, body_markdown, primary_cta_label`,
 
     WR5: (ctx) => `Generate social media content.
 

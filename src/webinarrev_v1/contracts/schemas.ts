@@ -136,15 +136,9 @@ export const WR4EmailSchema = z.object({
   preview_text: z.string(),
   body_markdown: z.string(),
   primary_cta_label: z.string(),
-  primary_cta_link_placeholder: z.string(),
 }).strict();
 
 export const WR4Schema = z.object({
-  send_rules: z.object({
-    from_name_placeholder: z.string(),
-    from_email_placeholder: z.string(),
-    reply_to_placeholder: z.string(),
-  }).strict(),
   emails: z.array(WR4EmailSchema).min(8).max(10),
   qa: QAReportSchema,
 }).strict();

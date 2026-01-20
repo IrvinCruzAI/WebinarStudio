@@ -7,9 +7,6 @@ import {
 
 const CRITICAL_PLACEHOLDERS = [
   'link_placeholder',
-  'from_email_placeholder',
-  'from_name_placeholder',
-  'reply_to_placeholder',
 ];
 
 const PLACEHOLDER_PATTERNS = [

@@ -20,13 +20,10 @@ import {
   Copy,
   Check,
   Thermometer,
-  Link,
-  Send,
 } from 'lucide-react';
-import type { CTA, AudienceTemperature, OperatorSettings } from '../../contracts';
+import type { CTA, AudienceTemperature } from '../../contracts';
 import type { ProjectMetadata, DeliverableId, WR1 } from '../../contracts';
 import { readTranscript, writeTranscript } from '../../store/storageService';
-import { updateOperatorSettings } from '../../store/metadataModel';
 import { formatDateTime } from '../utils/formatters';
 import { TextMetrics } from '../components/TextMetrics';
 import { FileUploadButton } from '../components/FileUploadButton';
@@ -79,12 +76,6 @@ export function ProjectSetupTab({
   const [editedDuration, setEditedDuration] = useState(project.settings.webinar_length_minutes);
   const [configChanged, setConfigChanged] = useState(false);
 
-  const [operatorSettings, setOperatorSettings] = useState<OperatorSettings>(
-    project.settings.operator || {}
-  );
-  const [isEditingOperator, setIsEditingOperator] = useState(false);
-  const [operatorChanged, setOperatorChanged] = useState(false);
-
   useEffect(() => {
     loadTranscripts();
   }, [project.project_id]);
@@ -93,11 +84,8 @@ export function ProjectSetupTab({
     setEditedCtaMode(project.settings.cta_mode);
     setEditedAudienceTemp(project.settings.audience_temperature);
     setEditedDuration(project.settings.webinar_length_minutes);
-    setOperatorSettings(project.settings.operator || {});
     setConfigChanged(false);
     setIsEditingConfig(false);
-    setIsEditingOperator(false);
-    setOperatorChanged(false);
   }, [project.project_id, project.settings]);
 
   const handleSaveConfig = () => {
@@ -121,24 +109,6 @@ export function ProjectSetupTab({
     setEditedAudienceTemp(project.settings.audience_temperature);
     setEditedDuration(project.settings.webinar_length_minutes);
     setIsEditingConfig(false);
-  };
-
-  const handleSaveOperatorSettings = () => {
-    updateOperatorSettings(project.project_id, operatorSettings);
-    setIsEditingOperator(false);
-    setOperatorChanged(true);
-  };
-
-  const handleCancelOperatorEdit = () => {
-    setOperatorSettings(project.settings.operator || {});
-    setIsEditingOperator(false);
-  };
-
-  const handleOperatorFieldChange = (field: keyof OperatorSettings, value: string) => {
-    setOperatorSettings(prev => ({
-      ...prev,
-      [field]: value || undefined,
-    }));
   };
 
   const loadTranscripts = async () => {
@@ -423,125 +393,6 @@ export function ProjectSetupTab({
               />
             </div>
           )}
-        </SetupSection>
-
-        <SetupSection
-          id="operator"
-          title="Email & CTA Settings"
-          icon={Send}
-          expanded={expandedSections.has('operator')}
-          onToggle={() => toggleSection('operator')}
-        >
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <span className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
-                {isEditingOperator ? 'Edit email and CTA settings' : 'Configure values that cannot be inferred from transcripts'}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              {isEditingOperator ? (
-                <>
-                  <button onClick={handleCancelOperatorEdit} className="btn-ghost text-xs">
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    Cancel
-                  </button>
-                  <button onClick={handleSaveOperatorSettings} className="btn-primary text-xs">
-                    <Save className="w-3.5 h-3.5" />
-                    Save
-                  </button>
-                </>
-              ) : (
-                <button onClick={() => setIsEditingOperator(true)} className="btn-ghost text-xs">
-                  <Edit3 className="w-3.5 h-3.5" />
-                  Edit
-                </button>
-              )}
-            </div>
-          </div>
-
-          {operatorChanged && !isEditingOperator && (
-            <div
-              className="p-3 rounded-xl flex items-center gap-2 mb-4"
-              style={{
-                background: 'rgb(var(--success) / 0.1)',
-                border: '1px solid rgb(var(--success) / 0.2)',
-              }}
-            >
-              <Check className="w-4 h-4" style={{ color: 'rgb(var(--success))' }} />
-              <span className="text-sm" style={{ color: 'rgb(var(--text-primary))' }}>
-                Settings saved. Regenerate to apply to deliverables.
-              </span>
-            </div>
-          )}
-
-          <div className="space-y-4">
-            <div>
-              <h4 className="text-sm font-medium mb-3 flex items-center gap-2" style={{ color: 'rgb(var(--text-primary))' }}>
-                <Mail className="w-4 h-4" style={{ color: 'rgb(var(--text-muted))' }} />
-                Email Settings
-                <span className="text-xs font-normal px-2 py-0.5 rounded-full" style={{ background: 'rgb(var(--surface-base))', color: 'rgb(var(--text-muted))' }}>
-                  Used by: WR4 Emails
-                </span>
-              </h4>
-              <div className="grid grid-cols-3 gap-4">
-                <OperatorField
-                  label="Sender Name"
-                  value={operatorSettings.sender_name || ''}
-                  placeholder="e.g., John Smith"
-                  isEditing={isEditingOperator}
-                  onChange={(v) => handleOperatorFieldChange('sender_name', v)}
-                />
-                <OperatorField
-                  label="Sender Email"
-                  value={operatorSettings.sender_email || ''}
-                  placeholder="e.g., john@company.com"
-                  isEditing={isEditingOperator}
-                  onChange={(v) => handleOperatorFieldChange('sender_email', v)}
-                  type="email"
-                />
-                <OperatorField
-                  label="Reply-To Email"
-                  value={operatorSettings.reply_to_email || ''}
-                  placeholder="e.g., support@company.com"
-                  isEditing={isEditingOperator}
-                  onChange={(v) => handleOperatorFieldChange('reply_to_email', v)}
-                  type="email"
-                />
-              </div>
-            </div>
-
-            <div>
-              <h4 className="text-sm font-medium mb-3 flex items-center gap-2" style={{ color: 'rgb(var(--text-primary))' }}>
-                <Link className="w-4 h-4" style={{ color: 'rgb(var(--text-muted))' }} />
-                CTA Links
-                <span className="text-xs font-normal px-2 py-0.5 rounded-full" style={{ background: 'rgb(var(--surface-base))', color: 'rgb(var(--text-muted))' }}>
-                  Used by: WR3 Landing Page, WR4 Emails, WR6 Run of Show
-                </span>
-              </h4>
-              <div className="grid grid-cols-2 gap-4">
-                <OperatorField
-                  label="Primary CTA Link"
-                  value={operatorSettings.primary_cta_link || ''}
-                  placeholder="https://..."
-                  isEditing={isEditingOperator}
-                  onChange={(v) => handleOperatorFieldChange('primary_cta_link', v)}
-                  type="url"
-                />
-                <OperatorField
-                  label="Registration Link"
-                  value={operatorSettings.registration_link || ''}
-                  placeholder="https://..."
-                  isEditing={isEditingOperator}
-                  onChange={(v) => handleOperatorFieldChange('registration_link', v)}
-                  type="url"
-                />
-              </div>
-            </div>
-          </div>
-
-          <p className="text-xs mt-4" style={{ color: 'rgb(var(--text-muted))' }}>
-            These values cannot be inferred from transcripts. Set them here to reduce placeholder issues in QA.
-          </p>
         </SetupSection>
 
         <SetupSection

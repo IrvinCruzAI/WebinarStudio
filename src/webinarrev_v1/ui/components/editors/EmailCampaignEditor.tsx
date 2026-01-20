@@ -3,9 +3,6 @@ import {
   Edit3,
   Eye,
   Clock,
-  User,
-  AtSign,
-  ExternalLink,
   AlertTriangle,
   CheckCircle2,
 } from 'lucide-react';
@@ -157,28 +154,22 @@ export function EmailCampaignEditor({ content, onEdit, initialEditMode = false }
               }}
             >
               <div
-                className="p-4 space-y-3"
-                style={{ background: 'rgb(var(--surface-elevated))' }}
+                className="p-4 border-b"
+                style={{ background: 'rgb(var(--accent-primary) / 0.05)', borderColor: 'rgb(var(--border-default))' }}
               >
-                <div className="flex items-center gap-3 text-sm">
-                  <User className="w-4 h-4" style={{ color: 'rgb(var(--text-muted))' }} />
-                  <span style={{ color: 'rgb(var(--text-muted))' }}>From:</span>
-                  <span style={{ color: 'rgb(var(--text-primary))' }}>
-                    {content.send_rules.from_name_placeholder}
-                  </span>
-                  <span style={{ color: 'rgb(var(--text-muted))' }}>
-                    &lt;{content.send_rules.from_email_placeholder}&gt;
-                  </span>
-                </div>
+                <p className="text-xs font-medium mb-2" style={{ color: 'rgb(var(--text-primary))' }}>
+                  Email Campaign Copy
+                </p>
+                <p className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+                  This is marketing copy to paste into your email platform (Mailchimp, ConvertKit, ActiveCampaign, etc).
+                  Configure sender names, emails, and links in your email tool.
+                </p>
+              </div>
 
-                <div className="flex items-center gap-3 text-sm">
-                  <AtSign className="w-4 h-4" style={{ color: 'rgb(var(--text-muted))' }} />
-                  <span style={{ color: 'rgb(var(--text-muted))' }}>Reply-to:</span>
-                  <span style={{ color: 'rgb(var(--text-primary))' }}>
-                    {content.send_rules.reply_to_placeholder}
-                  </span>
-                </div>
-
+              <div
+                className="px-4 py-3 border-b"
+                style={{ borderColor: 'rgb(var(--border-default))' }}
+              >
                 <div className="flex items-center gap-3 text-sm">
                   <Clock className="w-4 h-4" style={{ color: 'rgb(var(--text-muted))' }} />
                   <span style={{ color: 'rgb(var(--text-muted))' }}>Timing:</span>
@@ -313,39 +304,33 @@ export function EmailCampaignEditor({ content, onEdit, initialEditMode = false }
                   )}
                 </div>
 
-                <div
-                  className="p-4 rounded-lg text-center"
-                  style={{ background: 'rgb(var(--accent-primary) / 0.1)' }}
-                >
+                <div className="mb-4">
+                  <label className="text-xs font-medium mb-2 block" style={{ color: 'rgb(var(--text-muted))' }}>
+                    Call-to-Action Button
+                  </label>
                   {editMode ? (
-                    <div className="space-y-2">
-                      <input
-                        type="text"
-                        value={selectedEmail.primary_cta_label}
-                        onChange={(e) =>
-                          onEdit(`emails[${selectedEmailIndex}].primary_cta_label`, e.target.value)
-                        }
-                        className="px-6 py-3 rounded-lg font-medium text-center focus:outline-none"
-                        style={{ background: 'rgb(var(--accent-primary))', color: 'white' }}
-                      />
-                      <div className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
-                        Link: {selectedEmail.primary_cta_link_placeholder}
-                      </div>
-                    </div>
+                    <input
+                      type="text"
+                      value={selectedEmail.primary_cta_label}
+                      onChange={(e) =>
+                        onEdit(`emails[${selectedEmailIndex}].primary_cta_label`, e.target.value)
+                      }
+                      className="w-full px-6 py-3 rounded-lg font-medium text-center focus:outline-none border"
+                      style={{ background: 'rgb(var(--accent-primary))', color: 'white', borderColor: 'rgb(var(--border-default))' }}
+                    />
                   ) : (
-                    <>
+                    <div className="text-center">
                       <button
                         className="px-6 py-3 rounded-lg font-medium inline-flex items-center gap-2"
                         style={{ background: 'rgb(var(--accent-primary))', color: 'white' }}
                       >
                         {selectedEmail.primary_cta_label}
-                        <ExternalLink className="w-4 h-4" />
                       </button>
-                      <div className="mt-2 text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
-                        {selectedEmail.primary_cta_link_placeholder}
-                      </div>
-                    </>
+                    </div>
                   )}
+                  <p className="mt-2 text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+                    Configure the button link in your email platform
+                  </p>
                 </div>
               </div>
             </div>
