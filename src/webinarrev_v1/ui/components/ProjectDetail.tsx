@@ -12,6 +12,8 @@ import {
   Settings,
   Play,
 } from 'lucide-react';
+import { checkRequiredSettings, type MissingSettingsWarning } from '../../utils/settingsChecker';
+import { SettingsWarningModal } from '../modals/SettingsWarningModal';
 import type {
   ProjectMetadata,
   DeliverableId,
@@ -123,6 +125,8 @@ export default function ProjectDetail({
   const [validationResults, setValidationResults] = useState<Map<DeliverableId, ValidationResult>>(new Map());
   const [debugPanelVisible, setDebugPanelVisible] = useState(false);
   const [regenerationModal, setRegenerationModal] = useState<{ deliverableId: DeliverableId; cascade: boolean } | null>(null);
+  const [showSettingsWarning, setShowSettingsWarning] = useState(false);
+  const [settingsWarnings, setSettingsWarnings] = useState<MissingSettingsWarning[]>([]);
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -137,6 +141,18 @@ export default function ProjectDetail({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  const handleRunPipeline = () => {
+    const warnings = checkRequiredSettings(project.settings.operator);
+
+    if (warnings.length > 0) {
+      setSettingsWarnings(warnings);
+      setShowSettingsWarning(true);
+      return;
+    }
+
+    onRunPipeline();
+  };
 
   const status = STATUS_CONFIG[project.status];
   const wr1 = artifacts.get('WR1')?.content as WR1 | undefined;
@@ -302,7 +318,7 @@ export default function ProjectDetail({
 
         <div className="flex items-center gap-3">
           <button
-            onClick={onRunPipeline}
+            onClick={handleRunPipeline}
             disabled={isRunning || project.status === 'generating'}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
               isRunning || project.status === 'generating'
@@ -464,6 +480,20 @@ export default function ProjectDetail({
           onCancel={() => setRegenerationModal(null)}
         />
       )}
+
+      <SettingsWarningModal
+        isOpen={showSettingsWarning}
+        warnings={settingsWarnings}
+        onClose={() => setShowSettingsWarning(false)}
+        onProceedAnyway={() => {
+          setShowSettingsWarning(false);
+          onRunPipeline();
+        }}
+        onGoToSettings={() => {
+          setShowSettingsWarning(false);
+          setActiveTab('setup');
+        }}
+      />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Download,
   Package,
@@ -137,12 +137,7 @@ export function QAExportTab({
     new Set(['SETTINGS_REQUIRED', 'INPUT_MISSING', 'MODEL_UNCERTAIN'])
   );
 
-  useEffect(() => {
-    checkEligibility();
-    scanIssues();
-  }, [project.project_id, project.run_id, artifacts]);
-
-  const checkEligibility = async () => {
+  const checkEligibility = useCallback(async () => {
     if (!project.run_id) {
       setEligibility(null);
       setIsCheckingEligibility(false);
@@ -158,9 +153,9 @@ export function QAExportTab({
     } finally {
       setIsCheckingEligibility(false);
     }
-  };
+  }, [project.project_id, project.run_id]);
 
-  const scanIssues = async () => {
+  const scanIssues = useCallback(async () => {
     setIsScanning(true);
     const foundIssues: Issue[] = [];
     const foundPlaceholders: PlaceholderMatch[] = [];
@@ -206,7 +201,12 @@ export function QAExportTab({
     setIssues(foundIssues);
     setPlaceholders(foundPlaceholders);
     setIsScanning(false);
-  };
+  }, [artifacts]);
+
+  useEffect(() => {
+    checkEligibility();
+    scanIssues();
+  }, [checkEligibility, scanIssues]);
 
   const taggedResult = useMemo(() => {
     const rawIssues: RawIssue[] = issues.map(issue => ({

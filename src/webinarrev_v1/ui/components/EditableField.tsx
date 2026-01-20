@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Check, X, RotateCcw, Loader2 } from 'lucide-react';
+import { Check, X, RotateCcw, Loader2, Edit3 } from 'lucide-react';
 
 interface EditableFieldProps {
   label: string;
@@ -91,13 +91,19 @@ export function EditableField({
 
   return (
     <div className={fullWidth ? 'col-span-2' : ''}>
-      <div className="flex items-center gap-1.5 mb-1">
+      <div className="flex items-center gap-1.5 mb-1 group">
         <label
           className="text-xs font-medium uppercase tracking-wide"
           style={{ color: 'rgb(var(--text-muted))' }}
         >
           {label}
         </label>
+        {!isEditing && (
+          <Edit3
+            className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity"
+            style={{ color: 'rgb(var(--text-muted))' }}
+          />
+        )}
         {isEdited && (
           <span
             className="text-[10px] px-1.5 py-0.5 rounded font-medium"
@@ -157,8 +163,17 @@ export function EditableField({
         <div className="group relative">
           <p
             onClick={() => setIsEditing(true)}
-            className="text-sm cursor-pointer rounded px-2 py-1 -mx-2 hover:bg-[rgb(var(--surface-base))] transition-colors"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setIsEditing(true);
+              }
+            }}
+            className="text-sm cursor-pointer rounded px-2 py-1 -mx-2 hover:bg-[rgb(var(--surface-base))] transition-colors focus:outline-none focus:ring-2 focus:ring-[rgb(var(--accent-primary))] focus:ring-offset-2"
             style={{ color: value ? 'rgb(var(--text-primary))' : 'rgb(var(--text-muted))' }}
+            role="button"
+            tabIndex={0}
+            aria-label={`Edit ${label}`}
           >
             {value || 'Not specified'}
           </p>

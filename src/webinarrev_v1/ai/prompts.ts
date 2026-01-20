@@ -320,7 +320,7 @@ CRITICAL:
 
 WR1 DATA:
 ${JSON.stringify(ctx.dependencies?.WR1 || {}, null, 2).slice(0, 2000)}
-
+${buildOperatorSettingsContext(ctx.settings.operator)}
 CRITICAL: email_id MUST use two-digit format with leading zero: E01, E02, E03, E04, E05, E06, E07, E08, E09, E10
 NOT: E1, E2, E3... - single digits will cause validation failure!
 
@@ -409,7 +409,7 @@ REQUIREMENTS:
 
 WR2 FRAMEWORK:
 ${JSON.stringify(ctx.dependencies?.WR2 || {}, null, 2)}
-
+${buildOperatorSettingsContext(ctx.settings.operator)}
 Return JSON with EXACTLY this structure:
 {
   "total_duration_minutes": ${ctx.settings.webinar_length_minutes},

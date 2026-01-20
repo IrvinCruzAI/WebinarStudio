@@ -1,5 +1,8 @@
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARS_REGEX = /[\x00-\x1F\x7F-\x9F]/g;
+
 export const runOpenRouterStep = async (
   stepId: string,
   data: any,
@@ -91,7 +94,7 @@ export const runOpenRouterStep = async (
           console.warn(`[${stepId}] Initial JSON parse failed, attempting to sanitize...`);
 
           let sanitizedContent = content
-            .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
+            .replace(CONTROL_CHARS_REGEX, '')
             .replace(/\n/g, '\\n')
             .replace(/\r/g, '\\r')
             .replace(/\t/g, '\\t')

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Settings,
   FileText,
@@ -90,9 +90,24 @@ export function ProjectSetupTab({
   const [editedSenderEmail, setEditedSenderEmail] = useState(project.settings?.operator?.sender_email || '');
   const [editedReplyToEmail, setEditedReplyToEmail] = useState(project.settings?.operator?.reply_to_email || '');
 
+  const loadTranscripts = useCallback(async () => {
+    setIsLoadingTranscripts(true);
+    try {
+      const data = await readTranscript(project.project_id);
+      if (data) {
+        setTranscripts(data as TranscriptData);
+        setEditedBuild(data.build_transcript || '');
+        setEditedIntake(data.intake_transcript || '');
+        setEditedNotes(data.operator_notes || '');
+      }
+    } finally {
+      setIsLoadingTranscripts(false);
+    }
+  }, [project.project_id]);
+
   useEffect(() => {
     loadTranscripts();
-  }, [project.project_id]);
+  }, [loadTranscripts]);
 
   useEffect(() => {
     setEditedCtaMode(project.settings.cta_mode);
@@ -182,20 +197,6 @@ export function ProjectSetupTab({
     setIsEditingUrls(false);
   };
 
-  const loadTranscripts = async () => {
-    setIsLoadingTranscripts(true);
-    try {
-      const data = await readTranscript(project.project_id);
-      if (data) {
-        setTranscripts(data as TranscriptData);
-        setEditedBuild(data.build_transcript || '');
-        setEditedIntake(data.intake_transcript || '');
-        setEditedNotes(data.operator_notes || '');
-      }
-    } finally {
-      setIsLoadingTranscripts(false);
-    }
-  };
 
   const handleSaveTranscripts = async () => {
     setIsSaving(true);

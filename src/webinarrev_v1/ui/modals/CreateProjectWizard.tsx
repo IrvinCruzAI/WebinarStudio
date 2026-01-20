@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   X,
   ChevronRight,
@@ -80,6 +80,8 @@ export function CreateProjectWizard({ isOpen, onClose, onSubmit }: CreateProject
   const [existingDrafts, setExistingDrafts] = useState<DraftData[]>([]);
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [formData, setFormData] = useState<ProjectFormData>(DEFAULT_FORM_DATA);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -122,7 +124,7 @@ export function CreateProjectWizard({ isOpen, onClose, onSubmit }: CreateProject
         clearTimeout(autoSaveTimerRef.current);
       }
     };
-  }, [formData, isOpen]);
+  }, [formData, isOpen, handleAutoSave]);
 
   const checkForExistingDrafts = async () => {
     try {
@@ -136,7 +138,8 @@ export function CreateProjectWizard({ isOpen, onClose, onSubmit }: CreateProject
     }
   };
 
-  const handleAutoSave = async () => {
+  const handleAutoSave = useCallback(async () => {
+    setSaveStatus('saving');
     try {
       const draftData: DraftData = {
         draft_id: draftId,
@@ -155,10 +158,15 @@ export function CreateProjectWizard({ isOpen, onClose, onSubmit }: CreateProject
         updated_at: Date.now(),
       };
       await saveDraft(draftData);
+      setSaveStatus('saved');
+      setSaveError(null);
+      setTimeout(() => setSaveStatus('idle'), 3000);
     } catch (error) {
       console.error('Failed to auto-save draft:', error);
+      setSaveStatus('error');
+      setSaveError(error instanceof Error ? error.message : 'Failed to save draft');
     }
-  };
+  }, [draftId, formData]);
 
   const handleResumeDraft = async (draft: DraftData) => {
     setFormData({
@@ -294,7 +302,7 @@ export function CreateProjectWizard({ isOpen, onClose, onSubmit }: CreateProject
         onClick={handleClose}
       />
       <div
-        className="relative w-full max-w-3xl max-h-[90vh] overflow-hidden rounded-2xl shadow-xl animate-in flex flex-col"
+        className="relative w-full max-w-xl sm:max-w-2xl md:max-w-3xl max-h-[90vh] overflow-hidden rounded-2xl shadow-xl animate-in flex flex-col"
         style={{
           background: 'rgb(var(--surface-elevated))',
           border: '1px solid rgb(var(--border-default))',
@@ -311,11 +319,32 @@ export function CreateProjectWizard({ isOpen, onClose, onSubmit }: CreateProject
             >
               New Project
             </h2>
-            {hasUnsavedChanges && (
+            {hasUnsavedChanges && saveStatus === 'saving' && (
               <p className="text-xs flex items-center gap-1.5 mt-0.5" style={{ color: 'rgb(var(--text-muted))' }}>
                 <Clock className="w-3 h-3" />
                 Auto-saving...
               </p>
+            )}
+            {saveStatus === 'saved' && (
+              <p className="text-xs flex items-center gap-1.5 mt-0.5" style={{ color: 'rgb(var(--success))' }}>
+                <Check className="w-3 h-3" />
+                Saved
+              </p>
+            )}
+            {saveStatus === 'error' && (
+              <div className="flex items-center gap-2 mt-1">
+                <p className="text-xs flex items-center gap-1.5" style={{ color: 'rgb(var(--error))' }}>
+                  <AlertTriangle className="w-3 h-3" />
+                  Auto-save failed: {saveError}
+                </p>
+                <button
+                  onClick={handleAutoSave}
+                  className="text-xs underline"
+                  style={{ color: 'rgb(var(--error))' }}
+                >
+                  Retry
+                </button>
+              </div>
             )}
           </div>
           <button onClick={handleClose} className="btn-ghost p-2 -mr-2">
@@ -498,7 +527,7 @@ function BasicsStep({ formData, setFormData }: StepProps) {
         </h3>
 
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label
                 className="block text-sm font-medium mb-2"
@@ -535,7 +564,7 @@ function BasicsStep({ formData, setFormData }: StepProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label
                 className="block text-sm font-medium mb-2"
@@ -1034,7 +1063,7 @@ function ConfirmStep({ formData }: { formData: ProjectFormData }) {
     <div className="space-y-6">
       <InputQualityIndicator quality={qualityResult} showDetails={true} />
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div
           className="p-4 rounded-xl"
           style={{
