@@ -11,6 +11,7 @@ import {
   XCircle,
   Filter,
   Trash2,
+  Building2,
 } from 'lucide-react';
 import type { ProjectMetadata } from '../../contracts';
 import { DELIVERABLES, UI_DELIVERABLE_ORDER } from '../../contracts/deliverables';
@@ -234,10 +235,11 @@ function ProjectCard({ project, onClick, onDelete }: ProjectCardProps) {
 
       {clientName && (
         <p
-          className="text-sm mb-2 line-clamp-1"
+          className="text-sm mb-2 line-clamp-1 flex items-center gap-1.5"
           style={{ color: 'rgb(var(--text-secondary))' }}
         >
-          {clientName}
+          <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
+          <span className="truncate">{clientName}</span>
         </p>
       )}
 
@@ -247,7 +249,7 @@ function ProjectCard({ project, onClick, onDelete }: ProjectCardProps) {
           {formatRelativeTime(project.updated_at)}
         </span>
         {duration && (
-          <span>{duration}min</span>
+          <span>{duration}-minute webinar</span>
         )}
       </div>
 

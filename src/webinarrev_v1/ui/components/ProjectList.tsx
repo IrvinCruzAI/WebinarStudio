@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   RefreshCw,
   XCircle,
+  Building2,
 } from 'lucide-react';
 import type { ProjectMetadata } from '../../contracts';
 
@@ -209,7 +210,7 @@ export default function ProjectList({
                       <div className="h-4 w-px bg-slate-700" />
 
                       <div className="flex items-center gap-2 text-slate-400">
-                        <span>Client:</span>
+                        <Building2 className="w-3.5 h-3.5" />
                         <span className="text-slate-300">
                           {project.settings.client_name || project.settings.company_name}
                         </span>
@@ -220,9 +221,8 @@ export default function ProjectList({
                   <div className="h-4 w-px bg-slate-700" />
 
                   <div className="flex items-center gap-2 text-slate-400">
-                    <span>Duration:</span>
                     <span className="text-slate-300">
-                      {project.settings.webinar_length_minutes}min
+                      {project.settings.webinar_length_minutes}-minute webinar
                     </span>
                   </div>
                 </div>
