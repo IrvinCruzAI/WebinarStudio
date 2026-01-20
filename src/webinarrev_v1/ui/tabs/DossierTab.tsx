@@ -29,6 +29,7 @@ import type { ProjectMetadata, DeliverableId, WR1, TranscriptData } from '../../
 import { EditableField, EditableTextArea } from '../components/EditableField';
 import { readTranscript } from '../../store/storageService';
 import { useEffect } from 'react';
+import { hasExecutiveSummaryError } from '../../pipeline/orchestrator';
 
 interface DossierTabProps {
   project: ProjectMetadata;
@@ -41,6 +42,7 @@ interface DossierTabProps {
   isPipelineRunning: boolean;
   onRunPipeline: () => void;
   onEditDeliverable: (id: DeliverableId, field: string, value: unknown) => Promise<void>;
+  onRegenerateExecutiveSummary?: () => Promise<void>;
 }
 
 interface QAResolution {
@@ -55,6 +57,7 @@ export function DossierTab({
   isPipelineRunning,
   onRunPipeline,
   onEditDeliverable,
+  onRegenerateExecutiveSummary,
 }: DossierTabProps) {
   const [viewMode, setViewMode] = useState<'formatted' | 'json'>('formatted');
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
@@ -244,6 +247,7 @@ export function DossierTab({
               onToggle={() => toggleSection('summary')}
               onRunPipeline={onRunPipeline}
               isPipelineRunning={isPipelineRunning}
+              onRegenerateExecutiveSummary={onRegenerateExecutiveSummary}
             />
 
             <DossierSection
@@ -592,6 +596,7 @@ interface TransformationSummaryProps {
   onToggle: () => void;
   onRunPipeline: () => void;
   isPipelineRunning: boolean;
+  onRegenerateExecutiveSummary?: () => Promise<void>;
 }
 
 function TransformationSummary({
@@ -601,8 +606,21 @@ function TransformationSummary({
   onToggle,
   onRunPipeline,
   isPipelineRunning,
+  onRegenerateExecutiveSummary,
 }: TransformationSummaryProps) {
+  const [isRegenerating, setIsRegenerating] = useState(false);
   const summary = wr1.executive_summary;
+  const hasSummaryError = hasExecutiveSummaryError(wr1);
+
+  const handleRegenerate = async () => {
+    if (!onRegenerateExecutiveSummary || isRegenerating) return;
+    setIsRegenerating(true);
+    try {
+      await onRegenerateExecutiveSummary();
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
 
   return (
     <div
@@ -641,19 +659,39 @@ function TransformationSummary({
 
       {expanded && (
         <div className="px-5 pb-5">
-          {!summary ? (
+          {hasSummaryError ? (
             <div className="text-center py-8">
-              <p className="text-sm mb-4" style={{ color: 'rgb(var(--text-muted))' }}>
-                Run the pipeline to generate a strategic summary
-              </p>
-              <button
-                onClick={onRunPipeline}
-                disabled={isPipelineRunning}
-                className="btn-ghost text-sm"
+              <div
+                className="inline-flex p-3 rounded-full mb-4"
+                style={{ background: 'rgb(var(--error) / 0.1)' }}
               >
-                <Play className="w-4 h-4" />
-                Generate Summary
-              </button>
+                <AlertTriangle className="w-8 h-8" style={{ color: 'rgb(var(--error))' }} />
+              </div>
+              <p className="text-sm font-medium mb-2" style={{ color: 'rgb(var(--text-primary))' }}>
+                Executive Summary Error
+              </p>
+              <p className="text-sm mb-4" style={{ color: 'rgb(var(--text-muted))' }}>
+                {!summary ? 'The executive summary failed to generate' : 'The executive summary is incomplete or invalid'}
+              </p>
+              {onRegenerateExecutiveSummary && (
+                <button
+                  onClick={handleRegenerate}
+                  disabled={isRegenerating || isPipelineRunning}
+                  className="btn-primary text-sm"
+                >
+                  {isRegenerating ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Regenerating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      Regenerate Summary
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           ) : (
             <div className="space-y-6">

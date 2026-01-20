@@ -36,6 +36,7 @@ function V1AppContent() {
     revalidateDeliverable,
     revalidateAll,
     regenerateDeliverable,
+    regenerateExecutiveSummary,
     exportDocx,
     exportZip,
     removeProject,
@@ -129,6 +130,7 @@ function V1AppContent() {
               isPipelineRunning={isPipelineRunning}
               onRunPipeline={runPipeline}
               onEditDeliverable={handleEditDeliverable}
+              onRegenerateExecutiveSummary={regenerateExecutiveSummary}
             />
           )}
 

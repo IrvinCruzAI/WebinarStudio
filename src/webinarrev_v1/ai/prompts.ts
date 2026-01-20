@@ -486,3 +486,35 @@ CRITICAL:
   const promptFn = prompts[deliverableId];
   return promptFn ? promptFn(context) : 'No prompt available for this deliverable.';
 }
+
+export function buildExecutiveSummaryPrompt(buildTranscript: string, parsedIntake: Record<string, unknown>): {
+  system: string;
+  user: string;
+} {
+  const system = `You are an expert webinar content strategist. Generate ONLY a JSON executive summary object.
+
+OUTPUT FORMAT:
+{
+  "executive_summary": {
+    "overview": "2-3 sentence strategic overview",
+    "key_points": ["point 1", "point 2", "point 3"]
+  }
+}
+
+RULES:
+1. Output ONLY valid JSON - no markdown fences, no commentary
+2. overview must be 2-3 compelling sentences about the webinar's strategic positioning
+3. key_points must contain 3-5 actionable strategic insights`;
+
+  const user = `Generate an executive summary for this webinar.
+
+PARSED INTAKE DATA:
+${JSON.stringify(parsedIntake, null, 2)}
+
+BUILD TRANSCRIPT:
+${buildTranscript.slice(0, 6000)}
+
+Return ONLY the JSON object with executive_summary containing overview and key_points.`;
+
+  return { system, user };
+}

@@ -8,7 +8,7 @@ import {
 } from '../contracts';
 import { CancellableAIClient, createAIClient } from '../ai/client';
 import { AIQueue } from '../ai/queue';
-import { buildSystemPrompt, buildUserPrompt, getConstraintSummary, PromptContext } from '../ai/prompts';
+import { buildSystemPrompt, buildUserPrompt, getConstraintSummary, PromptContext, buildExecutiveSummaryPrompt } from '../ai/prompts';
 import { attemptRepair, formatValidationErrors } from './repairLoop';
 import { validateDeliverable } from './validator';
 import { scanPlaceholdersForProject } from './placeholderScanner';
@@ -715,4 +715,96 @@ export class PipelineOrchestrator {
     this.queue.cancel();
     this.aiClient.abort();
   }
+
+  async regenerateExecutiveSummary(projectId: string, runId: string): Promise<void> {
+    try {
+      const { readArtifact } = await import('../store/storageService');
+      const wr1Artifact = await readArtifact(projectId, runId, 'WR1');
+
+      if (!wr1Artifact?.content) {
+        throw new Error('WR1 artifact not found. Cannot regenerate executive summary without existing WR1 data.');
+      }
+
+      const transcriptData = await readTranscript(projectId);
+      if (!transcriptData?.build_transcript) {
+        throw new Error('Build transcript not found.');
+      }
+
+      const wr1 = wr1Artifact.content as Record<string, unknown>;
+      const parsedIntake = (wr1.parsed_intake || {}) as Record<string, unknown>;
+
+      const { system, user } = buildExecutiveSummaryPrompt(
+        transcriptData.build_transcript,
+        parsedIntake
+      );
+
+      this.reportProgress({
+        stage: 'Regenerating',
+        deliverableId: 'WR1',
+        status: 'generating',
+      });
+
+      const rawOutput = await this.queue.enqueue(() =>
+        this.aiClient.call(system, user, { maxTokens: 2000 })
+      );
+
+      let executiveSummary: { overview: string; key_points: string[] };
+
+      if (typeof rawOutput === 'object' && rawOutput !== null) {
+        const output = rawOutput as Record<string, unknown>;
+        if (output.executive_summary) {
+          executiveSummary = output.executive_summary as { overview: string; key_points: string[] };
+        } else if (output.overview && output.key_points) {
+          executiveSummary = output as unknown as { overview: string; key_points: string[] };
+        } else {
+          throw new Error('Invalid executive summary response format');
+        }
+      } else {
+        throw new Error('Invalid AI response');
+      }
+
+      if (!executiveSummary.overview || typeof executiveSummary.overview !== 'string' || executiveSummary.overview.length < 20) {
+        throw new Error('Executive summary overview is missing or too short');
+      }
+
+      if (!Array.isArray(executiveSummary.key_points) || executiveSummary.key_points.length < 2) {
+        throw new Error('Executive summary must have at least 2 key points');
+      }
+
+      const updatedWr1 = {
+        ...wr1,
+        executive_summary: executiveSummary,
+      };
+
+      await atomicArtifactWrite(projectId, runId, 'WR1', updatedWr1, true);
+
+      this.reportProgress({
+        stage: 'Regenerating',
+        deliverableId: 'WR1',
+        status: 'complete',
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.reportProgress({
+        stage: 'Regenerating',
+        deliverableId: 'WR1',
+        status: 'error',
+        error: errorMessage,
+      });
+      throw error;
+    }
+  }
+}
+
+export function hasExecutiveSummaryError(wr1: unknown): boolean {
+  if (!wr1 || typeof wr1 !== 'object') return true;
+
+  const data = wr1 as Record<string, unknown>;
+  const summary = data.executive_summary as Record<string, unknown> | undefined | null;
+
+  if (!summary) return true;
+  if (!summary.overview || typeof summary.overview !== 'string' || (summary.overview as string).length < 20) return true;
+  if (!Array.isArray(summary.key_points) || summary.key_points.length === 0) return true;
+
+  return false;
 }

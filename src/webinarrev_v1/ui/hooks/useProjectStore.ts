@@ -537,6 +537,50 @@ export function useProjectStore() {
     loadProjects();
   }, [state.selectedProjectId, loadProjects]);
 
+  const regenerateExecutiveSummary = useCallback(async () => {
+    if (!state.selectedProjectId) return;
+
+    const project = getProject(state.selectedProjectId);
+    if (!project || !project.run_id) return;
+
+    const orchestrator = new PipelineOrchestrator((progress) => {
+      setState((s) => ({
+        ...s,
+        pipelineProgress: [...s.pipelineProgress.filter(p => p.deliverableId !== progress.deliverableId), progress],
+      }));
+    });
+
+    setState((s) => ({
+      ...s,
+      isPipelineRunning: true,
+      pipelineProgress: [],
+      error: null,
+      pipelineError: null,
+      orchestrator,
+    }));
+
+    try {
+      await orchestrator.regenerateExecutiveSummary(state.selectedProjectId, project.run_id);
+      await loadProjectArtifacts(state.selectedProjectId);
+    } catch (error) {
+      console.error('Executive summary regeneration failed:', error);
+
+      const pipelineError: PipelineError = {
+        message: error instanceof Error ? error.message : 'Executive summary regeneration failed',
+        deliverableId: 'WR1',
+        errorType: 'unknown',
+      };
+
+      setState((s) => ({
+        ...s,
+        error: pipelineError.message,
+        pipelineError,
+      }));
+    } finally {
+      setState((s) => ({ ...s, isPipelineRunning: false, orchestrator: null }));
+    }
+  }, [state.selectedProjectId, loadProjectArtifacts]);
+
   useEffect(() => {
     loadProjects();
   }, [loadProjects]);
@@ -556,6 +600,7 @@ export function useProjectStore() {
     revalidateDeliverable,
     revalidateAll,
     regenerateDeliverable,
+    regenerateExecutiveSummary,
     exportDocx,
     exportZip,
     removeProject,
