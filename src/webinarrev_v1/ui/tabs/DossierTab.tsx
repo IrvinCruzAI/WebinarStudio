@@ -201,20 +201,20 @@ export function DossierTab({
   return (
     <div className="flex-1 overflow-auto p-6">
       <div className="max-w-4xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-2">
           <div>
-            <h2 className="text-xl font-bold" style={{ color: 'rgb(var(--text-primary))' }}>
+            <h2 className="text-2xl font-bold mb-1" style={{ color: 'rgb(var(--text-primary))' }}>
               Client Profile Dossier
             </h2>
             <p className="text-sm" style={{ color: 'rgb(var(--text-muted))' }}>
               WR1 - Strategy foundation for all deliverables
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <CompletenessRing score={completenessScore} />
             <button
               onClick={() => setViewMode(viewMode === 'formatted' ? 'json' : 'formatted')}
-              className="btn-ghost text-sm"
+              className="btn-ghost"
             >
               {viewMode === 'formatted' ? (
                 <>
@@ -485,19 +485,16 @@ function IntakeContextBanner({ project, operatorNotes }: IntakeContextBannerProp
 
   return (
     <div
-      className="rounded-2xl p-4"
+      className="rounded-xl p-5 transition-all hover:shadow-sm"
       style={{
         background: 'rgb(var(--surface-elevated))',
-        border: '1px solid rgb(var(--border-default))',
+        border: '1.5px solid rgb(var(--border-default))',
       }}
     >
-      <div className="flex items-center gap-2 mb-3">
-        <Settings className="w-4 h-4" style={{ color: 'rgb(var(--text-muted))' }} />
-        <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'rgb(var(--text-muted))' }}>
+      <div className="flex items-center gap-2.5 mb-4">
+        <Settings className="w-4 h-4" style={{ color: 'rgb(var(--accent-primary))' }} />
+        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'rgb(var(--text-muted))' }}>
           Generation Context
-        </span>
-        <span className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
-          (from intake)
         </span>
       </div>
 
@@ -608,15 +605,15 @@ function TransformationSummary({
 
   return (
     <div
-      className="rounded-2xl overflow-hidden"
+      className="rounded-xl overflow-hidden transition-all hover:shadow-md"
       style={{
-        background: 'linear-gradient(135deg, rgb(var(--accent-primary) / 0.08) 0%, rgb(var(--surface-elevated)) 100%)',
-        border: '2px solid rgb(var(--accent-primary) / 0.2)',
+        background: 'linear-gradient(135deg, rgb(var(--accent-primary) / 0.06) 0%, rgb(var(--surface-elevated)) 100%)',
+        border: '2px solid rgb(var(--accent-primary) / 0.25)',
       }}
     >
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between p-5 hover:bg-[rgb(var(--surface-glass))] transition-colors"
+        className="w-full flex items-center justify-between p-6 hover:opacity-90 transition-opacity"
       >
         <div className="flex items-center gap-4">
           <div
@@ -635,9 +632,9 @@ function TransformationSummary({
           </div>
         </div>
         {expanded ? (
-          <ChevronDown className="w-5 h-5" style={{ color: 'rgb(var(--text-muted))' }} />
+          <ChevronDown className="w-5 h-5 transition-transform" style={{ color: 'rgb(var(--text-muted))' }} />
         ) : (
-          <ChevronRight className="w-5 h-5" style={{ color: 'rgb(var(--text-muted))' }} />
+          <ChevronRight className="w-5 h-5 transition-transform" style={{ color: 'rgb(var(--text-muted))' }} />
         )}
       </button>
 
@@ -822,55 +819,67 @@ function DossierSection({
     switch (highlight) {
       case 'strategic':
         return {
-          background: 'rgb(var(--accent-primary) / 0.03)',
-          border: '1px solid rgb(var(--accent-primary) / 0.15)',
+          background: 'rgb(var(--accent-primary) / 0.04)',
+          border: '2px solid rgb(var(--accent-primary) / 0.2)',
+          iconBg: 'rgb(var(--accent-primary) / 0.12)',
+          iconColor: 'rgb(var(--accent-primary))',
         };
       case 'proof':
         return {
-          background: 'rgb(var(--success) / 0.03)',
-          border: '1px solid rgb(var(--success) / 0.15)',
+          background: 'rgb(var(--success) / 0.04)',
+          border: '2px solid rgb(var(--success) / 0.2)',
+          iconBg: 'rgb(var(--success) / 0.12)',
+          iconColor: 'rgb(var(--success))',
         };
       case 'qa':
         return {
-          background: 'rgb(var(--warning) / 0.03)',
-          border: '1px solid rgb(var(--warning) / 0.15)',
+          background: 'rgb(var(--warning) / 0.04)',
+          border: '2px solid rgb(var(--warning) / 0.2)',
+          iconBg: 'rgb(var(--warning) / 0.12)',
+          iconColor: 'rgb(var(--warning))',
         };
       default:
         return {
           background: 'rgb(var(--surface-elevated))',
-          border: '1px solid rgb(var(--border-default))',
+          border: '1.5px solid rgb(var(--border-default))',
+          iconBg: 'rgb(var(--surface-base))',
+          iconColor: 'rgb(var(--text-muted))',
         };
     }
   };
 
+  const style = getHighlightStyle();
+
   return (
-    <div className="rounded-2xl overflow-hidden" style={getHighlightStyle()}>
+    <div className="rounded-xl overflow-hidden transition-all hover:shadow-sm" style={{ background: style.background, border: style.border }}>
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between p-4 hover:bg-[rgb(var(--surface-glass))] transition-colors"
+        className="w-full flex items-center justify-between p-5 hover:opacity-90 transition-opacity"
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           <div
-            className="p-2 rounded-lg"
-            style={{ background: 'rgb(var(--surface-base))' }}
+            className="p-2.5 rounded-lg transition-all"
+            style={{ background: style.iconBg }}
           >
-            <Icon className="w-4 h-4" style={{ color: 'rgb(var(--text-muted))' }} />
+            <Icon className="w-5 h-5" style={{ color: style.iconColor }} />
           </div>
-          <span className="font-semibold" style={{ color: 'rgb(var(--text-primary))' }}>
-            {title}
-          </span>
-          {completeness !== undefined && (
-            <CompletenessChip value={completeness} />
-          )}
+          <div className="flex items-center gap-3">
+            <span className="font-semibold text-base" style={{ color: 'rgb(var(--text-primary))' }}>
+              {title}
+            </span>
+            {completeness !== undefined && (
+              <CompletenessChip value={completeness} />
+            )}
+          </div>
         </div>
         {expanded ? (
-          <ChevronDown className="w-5 h-5" style={{ color: 'rgb(var(--text-muted))' }} />
+          <ChevronDown className="w-5 h-5 transition-transform" style={{ color: 'rgb(var(--text-muted))' }} />
         ) : (
-          <ChevronRight className="w-5 h-5" style={{ color: 'rgb(var(--text-muted))' }} />
+          <ChevronRight className="w-5 h-5 transition-transform" style={{ color: 'rgb(var(--text-muted))' }} />
         )}
       </button>
       {expanded && (
-        <div className="px-4 pb-4 pt-2">
+        <div className="px-5 pb-5 pt-1">
           {children}
         </div>
       )}
@@ -881,20 +890,20 @@ function DossierSection({
 function CompletenessChip({ value }: { value: number }) {
   const getStyle = () => {
     if (value >= 100) {
-      return { bg: 'rgb(var(--success) / 0.1)', color: 'rgb(var(--success))' };
+      return { bg: 'rgb(var(--success) / 0.15)', color: 'rgb(var(--success))', border: 'rgb(var(--success) / 0.3)' };
     }
     if (value >= 60) {
-      return { bg: 'rgb(var(--warning) / 0.1)', color: 'rgb(var(--warning))' };
+      return { bg: 'rgb(var(--warning) / 0.15)', color: 'rgb(var(--warning))', border: 'rgb(var(--warning) / 0.3)' };
     }
-    return { bg: 'rgb(var(--error) / 0.1)', color: 'rgb(var(--error))' };
+    return { bg: 'rgb(var(--error) / 0.15)', color: 'rgb(var(--error))', border: 'rgb(var(--error) / 0.3)' };
   };
 
   const style = getStyle();
 
   return (
     <span
-      className="text-xs font-medium px-2 py-0.5 rounded-full"
-      style={{ background: style.bg, color: style.color }}
+      className="text-xs font-semibold px-2.5 py-1 rounded-full"
+      style={{ background: style.bg, color: style.color, border: `1px solid ${style.border}` }}
     >
       {value >= 100 ? 'Complete' : `${value}%`}
     </span>
@@ -1571,17 +1580,19 @@ function GapAnalysis({ wr1, project, qaResolutions }: GapAnalysisProps) {
   if (gaps.length === 0) {
     return (
       <div
-        className="rounded-2xl p-6 text-center"
+        className="rounded-xl p-8 text-center transition-all hover:shadow-sm"
         style={{
-          background: 'rgb(var(--success) / 0.05)',
-          border: '1px solid rgb(var(--success) / 0.15)',
+          background: 'linear-gradient(135deg, rgb(var(--success) / 0.08) 0%, rgb(var(--success) / 0.03) 100%)',
+          border: '2px solid rgb(var(--success) / 0.25)',
         }}
       >
-        <CheckCircle2 className="w-10 h-10 mx-auto mb-3" style={{ color: 'rgb(var(--success))' }} />
-        <h3 className="text-lg font-semibold mb-1" style={{ color: 'rgb(var(--text-primary))' }}>
+        <div className="inline-flex p-3 rounded-full mb-4" style={{ background: 'rgb(var(--success) / 0.15)' }}>
+          <CheckCircle2 className="w-8 h-8" style={{ color: 'rgb(var(--success))' }} />
+        </div>
+        <h3 className="text-lg font-bold mb-2" style={{ color: 'rgb(var(--text-primary))' }}>
           Dossier Complete
         </h3>
-        <p className="text-sm" style={{ color: 'rgb(var(--text-muted))' }}>
+        <p className="text-sm leading-relaxed" style={{ color: 'rgb(var(--text-secondary))' }}>
           All required fields are filled and quality checks pass. Ready to generate deliverables.
         </p>
       </div>
@@ -1593,56 +1604,82 @@ function GapAnalysis({ wr1, project, qaResolutions }: GapAnalysisProps) {
 
   return (
     <div
-      className="rounded-2xl overflow-hidden"
+      className="rounded-xl overflow-hidden transition-all hover:shadow-sm"
       style={{
         background: 'rgb(var(--surface-elevated))',
-        border: '1px solid rgb(var(--border-default))',
+        border: '1.5px solid rgb(var(--border-default))',
       }}
     >
-      <div className="p-4 flex items-center justify-between border-b" style={{ borderColor: 'rgb(var(--border-default))' }}>
-        <div className="flex items-center gap-3">
+      <div className="p-5 flex items-center justify-between border-b" style={{ borderColor: 'rgb(var(--border-default))' }}>
+        <div className="flex items-center gap-4">
           <div
-            className="p-2 rounded-lg"
-            style={{ background: 'rgb(var(--warning) / 0.1)' }}
+            className="p-2.5 rounded-lg"
+            style={{ background: 'rgb(var(--warning) / 0.12)' }}
           >
-            <AlertTriangle className="w-4 h-4" style={{ color: 'rgb(var(--warning))' }} />
+            <AlertTriangle className="w-5 h-5" style={{ color: 'rgb(var(--warning))' }} />
           </div>
           <div>
-            <h3 className="font-semibold" style={{ color: 'rgb(var(--text-primary))' }}>
+            <h3 className="font-semibold text-base" style={{ color: 'rgb(var(--text-primary))' }}>
               Gap Analysis
             </h3>
-            <p className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
-              {highCount > 0 ? `${highCount} critical, ` : ''}{medCount} items to improve
+            <p className="text-sm" style={{ color: 'rgb(var(--text-muted))' }}>
+              {gaps.length} {gaps.length === 1 ? 'item' : 'items'} to improve
             </p>
           </div>
         </div>
       </div>
 
-      <div className="p-4 space-y-3">
+      <div className="p-5 space-y-3">
         {gaps.map((gap, index) => {
+          const severityIcons = {
+            high: XCircle,
+            medium: AlertTriangle,
+            low: Info,
+          };
           const severityColors = {
-            high: { bg: 'rgb(var(--error) / 0.1)', border: 'rgb(var(--error) / 0.2)', text: 'rgb(var(--error))' },
-            medium: { bg: 'rgb(var(--warning) / 0.1)', border: 'rgb(var(--warning) / 0.2)', text: 'rgb(var(--warning))' },
-            low: { bg: 'rgb(var(--accent-primary) / 0.1)', border: 'rgb(var(--accent-primary) / 0.2)', text: 'rgb(var(--accent-primary))' },
+            high: {
+              bg: 'linear-gradient(135deg, rgb(var(--error) / 0.08) 0%, rgb(var(--error) / 0.03) 100%)',
+              border: 'rgb(var(--error) / 0.25)',
+              text: 'rgb(var(--error))',
+              iconBg: 'rgb(var(--error) / 0.12)',
+            },
+            medium: {
+              bg: 'linear-gradient(135deg, rgb(var(--warning) / 0.08) 0%, rgb(var(--warning) / 0.03) 100%)',
+              border: 'rgb(var(--warning) / 0.25)',
+              text: 'rgb(var(--warning))',
+              iconBg: 'rgb(var(--warning) / 0.12)',
+            },
+            low: {
+              bg: 'linear-gradient(135deg, rgb(var(--accent-primary) / 0.08) 0%, rgb(var(--accent-primary) / 0.03) 100%)',
+              border: 'rgb(var(--accent-primary) / 0.25)',
+              text: 'rgb(var(--accent-primary))',
+              iconBg: 'rgb(var(--accent-primary) / 0.12)',
+            },
           };
           const colors = severityColors[gap.severity];
+          const SeverityIcon = severityIcons[gap.severity];
 
           return (
             <div
               key={index}
-              className="p-3 rounded-xl"
+              className="p-4 rounded-lg flex items-start gap-3"
               style={{
                 background: colors.bg,
-                border: `1px solid ${colors.border}`,
+                border: `1.5px solid ${colors.border}`,
               }}
             >
-              <p className="text-sm font-medium mb-1" style={{ color: 'rgb(var(--text-primary))' }}>
-                {gap.issue}
-              </p>
-              <p className="text-xs flex items-center gap-1" style={{ color: colors.text }}>
-                <Lightbulb className="w-3 h-3" />
-                {gap.recommendation}
-              </p>
+              <div className="p-1.5 rounded-lg flex-shrink-0" style={{ background: colors.iconBg }}>
+                <SeverityIcon className="w-4 h-4" style={{ color: colors.text }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium mb-1.5" style={{ color: 'rgb(var(--text-primary))' }}>
+                  {gap.issue}
+                </p>
+                <p className="text-xs flex items-center gap-1.5" style={{ color: 'rgb(var(--text-secondary))' }}>
+                  <Lightbulb className="w-3.5 h-3.5 flex-shrink-0" style={{ color: colors.text }} />
+                  {gap.recommendation}
+                </p>
+              </div>
             </div>
           );
         })}
