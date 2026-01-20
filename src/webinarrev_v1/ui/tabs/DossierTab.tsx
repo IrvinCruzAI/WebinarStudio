@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import {
   User,
   Target,
@@ -10,8 +10,10 @@ import {
   Eye,
   AlertTriangle,
   Play,
+  Sparkles,
 } from 'lucide-react';
 import type { ProjectMetadata, DeliverableId, WR1 } from '../../contracts';
+import { EditableField, EditableTextArea } from '../components/EditableField';
 
 interface DossierTabProps {
   project: ProjectMetadata;
@@ -30,6 +32,7 @@ export function DossierTab({
   artifacts,
   isPipelineRunning,
   onRunPipeline,
+  onEditDeliverable,
 }: DossierTabProps) {
   const [viewMode, setViewMode] = useState<'formatted' | 'json'>('formatted');
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
@@ -38,6 +41,7 @@ export function DossierTab({
 
   const wr1Artifact = artifacts.get('WR1');
   const wr1 = wr1Artifact?.content as WR1 | undefined;
+  const editedFields = wr1?.edited_fields || [];
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => {
@@ -50,6 +54,44 @@ export function DossierTab({
       return newSet;
     });
   };
+
+  const handleFieldSave = useCallback(async (fieldPath: string, value: string | null) => {
+    if (!wr1) return;
+
+    const pathParts = fieldPath.split('.');
+    let updatedContent = JSON.parse(JSON.stringify(wr1));
+    let current: Record<string, unknown> = updatedContent;
+
+    for (let i = 0; i < pathParts.length - 1; i++) {
+      current = current[pathParts[i]] as Record<string, unknown>;
+    }
+
+    current[pathParts[pathParts.length - 1]] = value;
+
+    if (!updatedContent.edited_fields) {
+      updatedContent.edited_fields = [];
+    }
+    if (!updatedContent.edited_fields.includes(fieldPath)) {
+      updatedContent.edited_fields.push(fieldPath);
+    }
+
+    await onEditDeliverable('WR1', '', updatedContent);
+  }, [wr1, onEditDeliverable]);
+
+  const handleFieldRevert = useCallback(async (fieldPath: string) => {
+    if (!wr1) return;
+
+    const updatedContent = JSON.parse(JSON.stringify(wr1));
+    if (updatedContent.edited_fields) {
+      updatedContent.edited_fields = updatedContent.edited_fields.filter(
+        (f: string) => f !== fieldPath
+      );
+    }
+
+    await onEditDeliverable('WR1', '', updatedContent);
+  }, [wr1, onEditDeliverable]);
+
+  const isFieldEdited = (fieldPath: string) => editedFields.includes(fieldPath);
 
   if (!wr1) {
     return (
@@ -122,6 +164,12 @@ export function DossierTab({
           <JsonViewer content={wr1} />
         ) : (
           <>
+            <ExecutiveSummaryHero
+              summary={wr1.executive_summary}
+              onRunPipeline={onRunPipeline}
+              isPipelineRunning={isPipelineRunning}
+            />
+
             <DossierSection
               id="client"
               title="Client & Speaker"
@@ -130,10 +178,38 @@ export function DossierTab({
               onToggle={() => toggleSection('client')}
             >
               <div className="grid grid-cols-2 gap-4">
-                <FieldDisplay label="Client Name" value={wr1.parsed_intake.client_name} />
-                <FieldDisplay label="Company" value={wr1.parsed_intake.company} />
-                <FieldDisplay label="Speaker Name" value={wr1.parsed_intake.speaker_name} />
-                <FieldDisplay label="Speaker Title" value={wr1.parsed_intake.speaker_title} />
+                <EditableField
+                  label="Client Name"
+                  value={wr1.parsed_intake.client_name}
+                  fieldPath="parsed_intake.client_name"
+                  isEdited={isFieldEdited('parsed_intake.client_name')}
+                  onSave={handleFieldSave}
+                  onRevert={handleFieldRevert}
+                />
+                <EditableField
+                  label="Company"
+                  value={wr1.parsed_intake.company}
+                  fieldPath="parsed_intake.company"
+                  isEdited={isFieldEdited('parsed_intake.company')}
+                  onSave={handleFieldSave}
+                  onRevert={handleFieldRevert}
+                />
+                <EditableField
+                  label="Speaker Name"
+                  value={wr1.parsed_intake.speaker_name}
+                  fieldPath="parsed_intake.speaker_name"
+                  isEdited={isFieldEdited('parsed_intake.speaker_name')}
+                  onSave={handleFieldSave}
+                  onRevert={handleFieldRevert}
+                />
+                <EditableField
+                  label="Speaker Title"
+                  value={wr1.parsed_intake.speaker_title}
+                  fieldPath="parsed_intake.speaker_title"
+                  isEdited={isFieldEdited('parsed_intake.speaker_title')}
+                  onSave={handleFieldSave}
+                  onRevert={handleFieldRevert}
+                />
               </div>
             </DossierSection>
 
@@ -145,11 +221,40 @@ export function DossierTab({
               onToggle={() => toggleSection('webinar')}
             >
               <div className="space-y-4">
-                <FieldDisplay label="Webinar Title" value={wr1.parsed_intake.webinar_title} fullWidth />
+                <EditableTextArea
+                  label="Webinar Title"
+                  value={wr1.parsed_intake.webinar_title}
+                  fieldPath="parsed_intake.webinar_title"
+                  isEdited={isFieldEdited('parsed_intake.webinar_title')}
+                  onSave={handleFieldSave}
+                  onRevert={handleFieldRevert}
+                  rows={2}
+                />
                 <div className="grid grid-cols-2 gap-4">
-                  <FieldDisplay label="Offer" value={wr1.parsed_intake.offer} />
-                  <FieldDisplay label="Tone" value={wr1.parsed_intake.tone} />
-                  <FieldDisplay label="Primary CTA Type" value={wr1.parsed_intake.primary_cta_type} />
+                  <EditableTextArea
+                    label="Offer"
+                    value={wr1.parsed_intake.offer}
+                    fieldPath="parsed_intake.offer"
+                    isEdited={isFieldEdited('parsed_intake.offer')}
+                    onSave={handleFieldSave}
+                    onRevert={handleFieldRevert}
+                  />
+                  <EditableField
+                    label="Tone"
+                    value={wr1.parsed_intake.tone}
+                    fieldPath="parsed_intake.tone"
+                    isEdited={isFieldEdited('parsed_intake.tone')}
+                    onSave={handleFieldSave}
+                    onRevert={handleFieldRevert}
+                  />
+                  <EditableField
+                    label="Primary CTA Type"
+                    value={wr1.parsed_intake.primary_cta_type}
+                    fieldPath="parsed_intake.primary_cta_type"
+                    isEdited={isFieldEdited('parsed_intake.primary_cta_type')}
+                    onSave={handleFieldSave}
+                    onRevert={handleFieldRevert}
+                  />
                 </div>
               </div>
             </DossierSection>
@@ -161,7 +266,15 @@ export function DossierTab({
               expanded={expandedSections.has('audience')}
               onToggle={() => toggleSection('audience')}
             >
-              <FieldDisplay label="Target Audience" value={wr1.parsed_intake.target_audience} fullWidth />
+              <EditableTextArea
+                label="Target Audience"
+                value={wr1.parsed_intake.target_audience}
+                fieldPath="parsed_intake.target_audience"
+                isEdited={isFieldEdited('parsed_intake.target_audience')}
+                onSave={handleFieldSave}
+                onRevert={handleFieldRevert}
+                rows={3}
+              />
             </DossierSection>
 
             <DossierSection
@@ -211,27 +324,113 @@ export function DossierTab({
                 <QAArrayDisplay label="Claims Requiring Proof" items={wr1.qa.claims_requiring_proof} type="info" />
               </div>
             </DossierSection>
-
-            <DossierSection
-              id="transcript"
-              title="Cleaned Transcript"
-              icon={FileText}
-              expanded={expandedSections.has('transcript')}
-              onToggle={() => toggleSection('transcript')}
-            >
-              <div
-                className="max-h-64 overflow-y-auto p-4 rounded-xl font-mono text-sm whitespace-pre-wrap scrollbar-thin"
-                style={{
-                  background: 'rgb(var(--surface-base))',
-                  color: 'rgb(var(--text-secondary))',
-                  lineHeight: 1.6,
-                }}
-              >
-                {wr1.cleaned_transcript || 'No transcript available'}
-              </div>
-            </DossierSection>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+interface ExecutiveSummaryHeroProps {
+  summary?: { overview: string; key_points: string[] };
+  onRunPipeline: () => void;
+  isPipelineRunning: boolean;
+}
+
+function ExecutiveSummaryHero({ summary, onRunPipeline, isPipelineRunning }: ExecutiveSummaryHeroProps) {
+  if (!summary) {
+    return (
+      <div
+        className="rounded-2xl p-6"
+        style={{
+          background: 'linear-gradient(135deg, rgb(var(--surface-elevated)) 0%, rgb(var(--surface-base)) 100%)',
+          border: '1px solid rgb(var(--border-default))',
+        }}
+      >
+        <div className="flex items-start gap-4">
+          <div
+            className="p-3 rounded-xl"
+            style={{ background: 'rgb(var(--accent-primary) / 0.1)' }}
+          >
+            <Sparkles className="w-6 h-6" style={{ color: 'rgb(var(--accent-primary))' }} />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-semibold mb-1" style={{ color: 'rgb(var(--text-primary))' }}>
+              Executive Summary
+            </h3>
+            <p className="text-sm mb-4" style={{ color: 'rgb(var(--text-muted))' }}>
+              Run the pipeline to generate an executive summary with key strategic insights
+            </p>
+            <button
+              onClick={onRunPipeline}
+              disabled={isPipelineRunning}
+              className="btn-ghost text-sm"
+            >
+              <Play className="w-4 h-4" />
+              Regenerate to Add Summary
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="rounded-2xl p-6"
+      style={{
+        background: 'linear-gradient(135deg, rgb(var(--accent-primary) / 0.05) 0%, rgb(var(--surface-elevated)) 100%)',
+        border: '1px solid rgb(var(--accent-primary) / 0.2)',
+      }}
+    >
+      <div className="flex items-start gap-4">
+        <div
+          className="p-3 rounded-xl flex-shrink-0"
+          style={{ background: 'rgb(var(--accent-primary) / 0.1)' }}
+        >
+          <Sparkles className="w-6 h-6" style={{ color: 'rgb(var(--accent-primary))' }} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-lg font-semibold mb-3" style={{ color: 'rgb(var(--text-primary))' }}>
+            Executive Summary
+          </h3>
+          <p
+            className="text-sm leading-relaxed mb-4"
+            style={{ color: 'rgb(var(--text-secondary))' }}
+          >
+            {summary.overview}
+          </p>
+          {summary.key_points.length > 0 && (
+            <div className="space-y-2">
+              <span
+                className="text-xs font-medium uppercase tracking-wide"
+                style={{ color: 'rgb(var(--text-muted))' }}
+              >
+                Key Strategic Points
+              </span>
+              <ul className="space-y-2">
+                {summary.key_points.map((point, index) => (
+                  <li
+                    key={index}
+                    className="flex items-start gap-2 text-sm"
+                    style={{ color: 'rgb(var(--text-secondary))' }}
+                  >
+                    <span
+                      className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0 mt-0.5"
+                      style={{
+                        background: 'rgb(var(--accent-primary) / 0.1)',
+                        color: 'rgb(var(--accent-primary))',
+                      }}
+                    >
+                      {index + 1}
+                    </span>
+                    {point}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -281,30 +480,6 @@ function DossierSection({ title, icon: Icon, expanded, onToggle, children }: Dos
           {children}
         </div>
       )}
-    </div>
-  );
-}
-
-function FieldDisplay({
-  label,
-  value,
-  fullWidth = false,
-}: {
-  label: string;
-  value: string | null | undefined;
-  fullWidth?: boolean;
-}) {
-  return (
-    <div className={fullWidth ? 'col-span-2' : ''}>
-      <label className="text-xs font-medium uppercase tracking-wide" style={{ color: 'rgb(var(--text-muted))' }}>
-        {label}
-      </label>
-      <p
-        className="mt-1 text-sm"
-        style={{ color: value ? 'rgb(var(--text-primary))' : 'rgb(var(--text-muted))' }}
-      >
-        {value || 'Not specified'}
-      </p>
     </div>
   );
 }
@@ -489,4 +664,3 @@ function JsonViewer({ content }: { content: unknown }) {
     </div>
   );
 }
-

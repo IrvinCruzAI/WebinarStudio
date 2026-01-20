@@ -33,6 +33,10 @@ export function getConstraintSummary(deliverableId: DeliverableId): string {
     "speaker_name": "string" | null,
     "speaker_title": "string" | null
   },
+  "executive_summary": {
+    "overview": "string (2-3 sentence strategic overview of the webinar opportunity)",
+    "key_points": ["string (3-5 key strategic points)"]
+  },
   "cleaned_transcript": "string",
   "structured_notes": ["string"],
   "main_themes": ["string"],
@@ -150,6 +154,14 @@ Return JSON with EXACTLY this structure (use null for any missing values):
     "speaker_name": "Name" or null,
     "speaker_title": "Title" or null
   },
+  "executive_summary": {
+    "overview": "2-3 sentence strategic overview of the webinar opportunity, positioning, and unique value proposition",
+    "key_points": [
+      "Key strategic point 1",
+      "Key strategic point 2",
+      "Key strategic point 3"
+    ]
+  },
   "cleaned_transcript": "cleaned transcript text here",
   "structured_notes": ["note 1", "note 2"],
   "main_themes": ["theme 1", "theme 2", "theme 3"],
@@ -166,6 +178,8 @@ Return JSON with EXACTLY this structure (use null for any missing values):
 }
 
 IMPORTANT:
+- executive_summary.overview should be a compelling 2-3 sentence summary that captures the webinar's strategic positioning
+- executive_summary.key_points should contain 3-5 actionable strategic insights
 - primary_cta_type MUST be exactly one of: "book_call", "buy_now", "hybrid", or null
 - proof_points type MUST be exactly one of: "testimonial", "metric", "case_study"
 - proof_points MUST have "content" field (NOT "point" or "text")`,

@@ -87,8 +87,8 @@ function V1AppContent() {
     await revalidateDeliverable(deliverableId);
   };
 
-  const handleRegenerate = async (deliverableId: DeliverableId, cascade: boolean = false) => {
-    await regenerateDeliverable(deliverableId, cascade);
+  const handleRegenerate = async (deliverableId: DeliverableId, cascade: boolean = false, preserveEdits: boolean = false) => {
+    await regenerateDeliverable(deliverableId, cascade, preserveEdits);
   };
 
   return (

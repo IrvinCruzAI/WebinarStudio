@@ -39,7 +39,7 @@ interface ProjectDetailProps {
   onRunPipeline: () => Promise<void>;
   onEditDeliverable: (deliverableId: DeliverableId, field: string, value: unknown) => Promise<void>;
   onRevalidateDeliverable: (deliverableId: DeliverableId) => Promise<ValidationResult>;
-  onRegenerateDeliverable: (deliverableId: DeliverableId, cascade: boolean) => Promise<void>;
+  onRegenerateDeliverable: (deliverableId: DeliverableId, cascade: boolean, preserveEdits?: boolean) => Promise<void>;
   onExportDocx: (deliverableId: DeliverableId) => Promise<void>;
   onExportZip: () => Promise<void>;
   onCancelPipeline: () => void;
@@ -188,10 +188,11 @@ export default function ProjectDetail({
     setRegenerationModal({ deliverableId, cascade });
   }
 
-  async function handleRegenerateConfirm() {
+  async function handleRegenerateConfirm(preserveEdits: boolean) {
     if (!regenerationModal) return;
+    const { deliverableId, cascade } = regenerationModal;
     setRegenerationModal(null);
-    await onRegenerateDeliverable(regenerationModal.deliverableId, regenerationModal.cascade);
+    await onRegenerateDeliverable(deliverableId, cascade, preserveEdits);
   }
 
   function computeAffectedDeliverables(targetId: DeliverableId, cascade: boolean): DeliverableId[] {

@@ -337,11 +337,45 @@ export function useProjectStore() {
     }
   }, [state.artifacts, revalidateDeliverable]);
 
-  const regenerateDeliverable = useCallback(async (deliverableId: DeliverableId, cascade: boolean) => {
+  const regenerateDeliverable = useCallback(async (
+    deliverableId: DeliverableId,
+    cascade: boolean,
+    preserveEdits: boolean = false
+  ) => {
     if (!state.selectedProjectId) return;
 
     const project = getProject(state.selectedProjectId);
     if (!project || !project.run_id) return;
+
+    let editedFieldsBackup: { fields: string[]; values: Map<string, unknown> } | null = null;
+
+    if (preserveEdits && deliverableId === 'WR1') {
+      const wr1Artifact = state.artifacts.get('WR1');
+      if (wr1Artifact) {
+        const wr1Content = wr1Artifact.content as Record<string, unknown>;
+        const editedFields = (wr1Content.edited_fields as string[]) || [];
+
+        if (editedFields.length > 0) {
+          const values = new Map<string, unknown>();
+          for (const fieldPath of editedFields) {
+            const pathParts = fieldPath.split('.');
+            let value: unknown = wr1Content;
+            for (const part of pathParts) {
+              if (value && typeof value === 'object') {
+                value = (value as Record<string, unknown>)[part];
+              } else {
+                value = undefined;
+                break;
+              }
+            }
+            if (value !== undefined) {
+              values.set(fieldPath, value);
+            }
+          }
+          editedFieldsBackup = { fields: editedFields, values };
+        }
+      }
+    }
 
     const orchestrator = new PipelineOrchestrator((progress) => {
       setState((s) => ({
@@ -366,6 +400,41 @@ export function useProjectStore() {
         deliverableId,
         cascade
       );
+
+      if (editedFieldsBackup && editedFieldsBackup.fields.length > 0) {
+        const freshArtifact = await readArtifact(
+          `${state.selectedProjectId}:${project.run_id}:WR1:v1`
+        );
+
+        if (freshArtifact) {
+          const mergedContent = JSON.parse(JSON.stringify(freshArtifact.content)) as Record<string, unknown>;
+
+          for (const [fieldPath, value] of editedFieldsBackup.values) {
+            const pathParts = fieldPath.split('.');
+            let target: Record<string, unknown> = mergedContent;
+
+            for (let i = 0; i < pathParts.length - 1; i++) {
+              const part = pathParts[i];
+              if (target[part] && typeof target[part] === 'object') {
+                target = target[part] as Record<string, unknown>;
+              }
+            }
+
+            target[pathParts[pathParts.length - 1]] = value;
+          }
+
+          mergedContent.edited_fields = editedFieldsBackup.fields;
+
+          await atomicArtifactWrite(
+            state.selectedProjectId,
+            project.run_id,
+            'WR1',
+            mergedContent,
+            false
+          );
+        }
+      }
+
       await loadProjects();
       await loadProjectArtifacts(state.selectedProjectId);
     } catch (error) {
@@ -398,7 +467,7 @@ export function useProjectStore() {
     } finally {
       setState((s) => ({ ...s, isPipelineRunning: false, orchestrator: null }));
     }
-  }, [state.selectedProjectId, loadProjects, loadProjectArtifacts]);
+  }, [state.selectedProjectId, state.artifacts, loadProjects, loadProjectArtifacts]);
 
   const cancelPipeline = useCallback(() => {
     if (state.orchestrator) {

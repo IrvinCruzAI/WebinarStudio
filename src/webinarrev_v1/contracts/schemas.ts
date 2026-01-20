@@ -35,6 +35,13 @@ export const PreflightStoredSchema = PreflightAISchema.extend({
 
 export type PreflightStored = z.infer<typeof PreflightStoredSchema>;
 
+export const ExecutiveSummarySchema = z.object({
+  overview: z.string(),
+  key_points: z.array(z.string()),
+}).strict();
+
+export type ExecutiveSummary = z.infer<typeof ExecutiveSummarySchema>;
+
 export const WR1Schema = z.object({
   parsed_intake: z.object({
     client_name: z.string().nullable(),
@@ -47,6 +54,8 @@ export const WR1Schema = z.object({
     speaker_name: z.string().nullable(),
     speaker_title: z.string().nullable(),
   }).strict(),
+  executive_summary: ExecutiveSummarySchema.optional(),
+  edited_fields: z.array(z.string()).optional(),
   cleaned_transcript: z.string(),
   structured_notes: z.array(z.string()),
   main_themes: z.array(z.string()),

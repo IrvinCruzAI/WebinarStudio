@@ -16,8 +16,11 @@ import {
   Target,
   ChevronDown,
   ChevronRight,
+  Sparkles,
+  Copy,
+  Check,
 } from 'lucide-react';
-import type { ProjectMetadata, DeliverableId } from '../../contracts';
+import type { ProjectMetadata, DeliverableId, WR1 } from '../../contracts';
 import { readTranscript, writeTranscript } from '../../store/storageService';
 import { formatDateTime } from '../utils/formatters';
 import { TextMetrics } from '../components/TextMetrics';
@@ -263,6 +266,15 @@ export function ProjectSetupTab({
             />
           )}
         </SetupSection>
+
+        {hasWR1 && (
+          <ProcessedTranscriptSection
+            wr1={artifacts.get('WR1')?.content as WR1}
+            generatedAt={wr1GeneratedAt}
+            expanded={expandedSections.has('processed')}
+            onToggle={() => toggleSection('processed')}
+          />
+        )}
       </div>
     </div>
   );
@@ -597,4 +609,116 @@ function formatAudienceTemp(temp: string): string {
     case 'hot': return 'Hot';
     default: return temp;
   }
+}
+
+interface ProcessedTranscriptSectionProps {
+  wr1: WR1;
+  generatedAt: number;
+  expanded: boolean;
+  onToggle: () => void;
+}
+
+function ProcessedTranscriptSection({
+  wr1,
+  generatedAt,
+  expanded,
+  onToggle,
+}: ProcessedTranscriptSectionProps) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(wr1.cleaned_transcript);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const wordCount = wr1.cleaned_transcript.trim().split(/\s+/).filter(Boolean).length;
+
+  return (
+    <div
+      className="rounded-2xl overflow-hidden"
+      style={{
+        background: 'rgb(var(--surface-elevated))',
+        border: '1px solid rgb(var(--border-default))',
+      }}
+    >
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between p-4 hover:bg-[rgb(var(--surface-glass))] transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className="p-2 rounded-lg"
+            style={{ background: 'rgb(var(--accent-primary) / 0.1)' }}
+          >
+            <Sparkles className="w-4 h-4" style={{ color: 'rgb(var(--accent-primary))' }} />
+          </div>
+          <div className="text-left">
+            <span className="font-semibold block" style={{ color: 'rgb(var(--text-primary))' }}>
+              AI-Processed Transcript
+            </span>
+            <span className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+              Generated from build transcript
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <span
+            className="text-xs px-2 py-1 rounded-lg"
+            style={{
+              background: 'rgb(var(--surface-base))',
+              color: 'rgb(var(--text-muted))',
+            }}
+          >
+            {wordCount.toLocaleString()} words
+          </span>
+          {expanded ? (
+            <ChevronDown className="w-5 h-5" style={{ color: 'rgb(var(--text-muted))' }} />
+          ) : (
+            <ChevronRight className="w-5 h-5" style={{ color: 'rgb(var(--text-muted))' }} />
+          )}
+        </div>
+      </button>
+      {expanded && (
+        <div className="px-4 pb-4 pt-2">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2 text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+              <Clock className="w-3.5 h-3.5" />
+              Generated: {formatDateTime(generatedAt)}
+            </div>
+            <button onClick={handleCopy} className="btn-ghost text-xs">
+              {copied ? (
+                <>
+                  <Check className="w-3.5 h-3.5" />
+                  Copied
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" />
+                  Copy
+                </>
+              )}
+            </button>
+          </div>
+          <div
+            className="p-4 rounded-xl max-h-[300px] overflow-y-auto scrollbar-thin"
+            style={{
+              background: 'rgb(var(--surface-base))',
+              border: '1px solid rgb(var(--border-subtle))',
+            }}
+          >
+            <p
+              className="text-sm whitespace-pre-wrap"
+              style={{ color: 'rgb(var(--text-secondary))', lineHeight: 1.7 }}
+            >
+              {wr1.cleaned_transcript || 'No processed transcript available'}
+            </p>
+          </div>
+          <p className="text-xs mt-3" style={{ color: 'rgb(var(--text-muted))' }}>
+            This is the AI-cleaned version of your build transcript, used as the foundation for all deliverables.
+          </p>
+        </div>
+      )}
+    </div>
+  );
 }
