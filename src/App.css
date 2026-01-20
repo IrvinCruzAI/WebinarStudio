@@ -1,0 +1,97 @@
+:root {
+  --youtube-red: #FF0000;
+  --youtube-dark: #282828;
+  --youtube-light: #F9F9F9;
+}
+
+body {
+  font-family: 'Roboto', sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+.step-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  margin-right: 12px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.step-active {
+  background-color: var(--youtube-red);
+  color: white;
+}
+
+.step-completed {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.step-pending {
+  background-color: #e0e0e0;
+  color: #757575;
+}
+
+.step-loading {
+  background-color: #FFC107;
+  color: white;
+}
+
+.loading-bar {
+  height: 4px;
+  background: linear-gradient(to right, var(--youtube-red) 0%, var(--youtube-red) 50%, transparent 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+}
+
+@keyframes loading {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0 0;
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.youtube-input {
+  transition: all 0.3s ease;
+  border: 1px solid #ccc;
+}
+
+.youtube-input:focus-within {
+  border-color: var(--youtube-red);
+  box-shadow: 0 0 0 2px rgba(255, 0, 0, 0.2);
+}
+
+.result-card {
+  transition: all 0.2s ease;
+}
+
+.result-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+}

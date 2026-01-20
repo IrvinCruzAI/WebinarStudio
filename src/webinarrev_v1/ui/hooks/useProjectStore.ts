@@ -1,0 +1,403 @@
+import { useState, useCallback, useEffect } from 'react';
+import type {
+  ProjectMetadata,
+  DeliverableId,
+  ValidationResult,
+} from '../../contracts';
+import {
+  getAllProjects,
+  createProject,
+  getProject,
+  updateProject,
+  updateProjectStatus,
+  updateDeliverablePointer,
+  deleteProject,
+} from '../../store/metadataModel';
+import {
+  readArtifact,
+  atomicArtifactWrite,
+  writeTranscript,
+  loadAllArtifacts,
+} from '../../store/storageService';
+import { PipelineOrchestrator, PipelineProgress, PreflightBlockedError, PipelineValidationError } from '../../pipeline/orchestrator';
+import { validateDeliverable } from '../../pipeline/validator';
+import { generateDocx } from '../../export/docxGenerator';
+import { generateExportZip } from '../../export/zipGenerator';
+import { computeExportEligibility } from '../../export/eligibilityComputer';
+import { safeGetRunIdFromArtifactId } from '../../contracts/ids';
+import type { ProjectFormData } from '../modals/CreateProjectWizard';
+
+export interface PipelineError {
+  message: string;
+  deliverableId?: DeliverableId;
+  details?: string[];
+  errorType?: 'api' | 'schema' | 'crosslink' | 'preflight' | 'unknown';
+}
+
+export interface ProjectStoreState {
+  projects: ProjectMetadata[];
+  selectedProjectId: string | null;
+  artifacts: Map<DeliverableId, {
+    content: unknown;
+    validated: boolean;
+    generated_at: number;
+    edited_at?: number;
+  }>;
+  isLoading: boolean;
+  isPipelineRunning: boolean;
+  pipelineProgress: PipelineProgress | null;
+  error: string | null;
+  pipelineError: PipelineError | null;
+}
+
+export function useProjectStore() {
+  const [state, setState] = useState<ProjectStoreState>({
+    projects: [],
+    selectedProjectId: null,
+    artifacts: new Map(),
+    isLoading: true,
+    isPipelineRunning: false,
+    pipelineProgress: null,
+    error: null,
+    pipelineError: null,
+  });
+
+  const clearError = useCallback(() => {
+    setState((s) => ({ ...s, error: null, pipelineError: null }));
+  }, []);
+
+  const loadProjects = useCallback(async () => {
+    setState((s) => ({ ...s, isLoading: true, error: null }));
+    try {
+      const projects = getAllProjects();
+      setState((s) => ({ ...s, projects, isLoading: false }));
+    } catch (error) {
+      setState((s) => ({
+        ...s,
+        error: error instanceof Error ? error.message : 'Failed to load projects',
+        isLoading: false,
+      }));
+    }
+  }, []);
+
+  const loadProjectArtifacts = useCallback(async (projectId: string) => {
+    const project = getProject(projectId);
+    if (!project) return;
+
+    const artifacts = new Map<DeliverableId, {
+      content: unknown;
+      validated: boolean;
+      generated_at: number;
+      edited_at?: number;
+    }>();
+
+    const deliverableIds: DeliverableId[] = [
+      'PREFLIGHT', 'WR1', 'WR2', 'WR3', 'WR4', 'WR5', 'WR6', 'WR7', 'WR8', 'WR9',
+    ];
+
+    for (const deliverableId of deliverableIds) {
+      const pointer = project.deliverable_pointers[deliverableId];
+      if (pointer) {
+        try {
+          const artifact = await readArtifact(pointer.artifact_id);
+          if (artifact) {
+            artifacts.set(deliverableId, {
+              content: artifact.content,
+              validated: artifact.validated,
+              generated_at: artifact.generated_at,
+              edited_at: artifact.edited_at,
+            });
+          }
+        } catch (error) {
+          console.warn(`Failed to load artifact ${deliverableId}:`, error);
+        }
+      }
+    }
+
+    setState((s) => ({ ...s, artifacts }));
+  }, []);
+
+  const selectProject = useCallback(async (projectId: string | null) => {
+    setState((s) => ({ ...s, selectedProjectId: projectId, artifacts: new Map(), pipelineError: null }));
+    if (projectId) {
+      await loadProjectArtifacts(projectId);
+    }
+  }, [loadProjectArtifacts]);
+
+  const createNewProject = useCallback(async (formData: ProjectFormData) => {
+    const projectId = `proj_${Date.now()}`;
+
+    createProject(projectId, formData.title, {
+      cta_mode: formData.ctaMode,
+      audience_temperature: formData.audienceTemperature,
+      webinar_length_minutes: formData.webinarLengthMinutes,
+    });
+
+    await writeTranscript(projectId, {
+      build_transcript: formData.buildTranscript,
+      intake_transcript: formData.intakeTranscript || undefined,
+      operator_notes: formData.operatorNotes || undefined,
+      created_at: Date.now(),
+    });
+
+    await loadProjects();
+    await selectProject(projectId);
+
+    return projectId;
+  }, [loadProjects, selectProject]);
+
+  const runPipeline = useCallback(async () => {
+    if (!state.selectedProjectId) return;
+
+    const project = getProject(state.selectedProjectId);
+    if (!project) return;
+
+    const runId = `run_${Date.now()}`;
+
+    updateProject(state.selectedProjectId, { run_id: runId });
+
+    setState((s) => ({
+      ...s,
+      isPipelineRunning: true,
+      pipelineProgress: null,
+      error: null,
+      pipelineError: null,
+    }));
+
+    updateProjectStatus(state.selectedProjectId, 'generating');
+    await loadProjects();
+
+    const orchestrator = new PipelineOrchestrator((progress) => {
+      setState((s) => ({ ...s, pipelineProgress: progress }));
+    });
+
+    try {
+      await orchestrator.runPipeline(state.selectedProjectId, runId);
+      await loadProjects();
+      await loadProjectArtifacts(state.selectedProjectId);
+    } catch (error) {
+      console.error('Pipeline failed:', error);
+
+      let pipelineError: PipelineError;
+
+      if (error instanceof PreflightBlockedError) {
+        pipelineError = {
+          message: 'Pipeline blocked: Missing required information',
+          errorType: 'preflight',
+          details: error.missingContext.map(mc => `${mc.field}: ${mc.why_it_matters}`),
+        };
+      } else if (error instanceof PipelineValidationError) {
+        pipelineError = {
+          message: error.message,
+          deliverableId: error.deliverableId,
+          details: error.validationErrors,
+          errorType: error.errorType,
+        };
+      } else {
+        pipelineError = {
+          message: error instanceof Error ? error.message : 'Pipeline failed with unknown error',
+          errorType: 'unknown',
+          details: error instanceof Error && error.stack ? [error.stack.split('\n')[0]] : undefined,
+        };
+      }
+
+      setState((s) => ({
+        ...s,
+        error: pipelineError.message,
+        pipelineError,
+      }));
+
+      await loadProjects();
+      await loadProjectArtifacts(state.selectedProjectId);
+    } finally {
+      setState((s) => ({ ...s, isPipelineRunning: false, pipelineProgress: null }));
+    }
+  }, [state.selectedProjectId, loadProjects, loadProjectArtifacts]);
+
+  const editDeliverable = useCallback(async (
+    deliverableId: DeliverableId,
+    field: string,
+    value: unknown
+  ) => {
+    if (!state.selectedProjectId) return;
+
+    const artifact = state.artifacts.get(deliverableId);
+    if (!artifact) return;
+
+    const content = artifact.content as Record<string, unknown>;
+    const pathParts = field.split(/[.\[\]]/).filter(Boolean);
+
+    let target: Record<string, unknown> = content;
+    for (let i = 0; i < pathParts.length - 1; i++) {
+      const part = pathParts[i];
+      const nextTarget = target[part];
+      if (nextTarget && typeof nextTarget === 'object') {
+        target = nextTarget as Record<string, unknown>;
+      } else {
+        return;
+      }
+    }
+
+    const lastPart = pathParts[pathParts.length - 1];
+    target[lastPart] = value;
+
+    const project = getProject(state.selectedProjectId);
+    if (!project) return;
+
+    const pointer = project.deliverable_pointers[deliverableId];
+    if (!pointer) return;
+
+    const runId = safeGetRunIdFromArtifactId(pointer.artifact_id);
+    if (!runId) {
+      console.error('[editDeliverable] Invalid artifact_id:', pointer.artifact_id);
+      return;
+    }
+
+    await atomicArtifactWrite(
+      state.selectedProjectId,
+      runId,
+      deliverableId,
+      content,
+      false
+    );
+
+    updateDeliverablePointer(state.selectedProjectId, deliverableId, {
+      ...pointer,
+      validated: false,
+      edited_at: Date.now(),
+    });
+
+    setState((s) => {
+      const newArtifacts = new Map(s.artifacts);
+      newArtifacts.set(deliverableId, {
+        ...artifact,
+        content,
+        validated: false,
+        edited_at: Date.now(),
+      });
+      return { ...s, artifacts: newArtifacts };
+    });
+  }, [state.selectedProjectId, state.artifacts]);
+
+  const revalidateDeliverable = useCallback(async (
+    deliverableId: DeliverableId
+  ): Promise<ValidationResult> => {
+    const artifact = state.artifacts.get(deliverableId);
+    if (!artifact) return { ok: false, errors: ['Artifact not found'] };
+
+    const dependencies = new Map<DeliverableId, unknown>();
+    state.artifacts.forEach((a, id) => {
+      dependencies.set(id, a.content);
+    });
+
+    const result = await validateDeliverable(deliverableId, artifact.content, dependencies);
+
+    if (!state.selectedProjectId) return result;
+
+    const project = getProject(state.selectedProjectId);
+    if (!project) return result;
+
+    const pointer = project.deliverable_pointers[deliverableId];
+    if (pointer) {
+      updateDeliverablePointer(state.selectedProjectId, deliverableId, {
+        ...pointer,
+        validated: result.ok,
+      });
+
+      setState((s) => {
+        const newArtifacts = new Map(s.artifacts);
+        const current = newArtifacts.get(deliverableId);
+        if (current) {
+          newArtifacts.set(deliverableId, { ...current, validated: result.ok });
+        }
+        return { ...s, artifacts: newArtifacts };
+      });
+    }
+
+    return result;
+  }, [state.artifacts, state.selectedProjectId]);
+
+  const revalidateAll = useCallback(async () => {
+    const deliverableIds: DeliverableId[] = ['WR1', 'WR2', 'WR3', 'WR4', 'WR5', 'WR6', 'WR7', 'WR8'];
+
+    for (const id of deliverableIds) {
+      if (state.artifacts.has(id)) {
+        await revalidateDeliverable(id);
+      }
+    }
+  }, [state.artifacts, revalidateDeliverable]);
+
+  const regenerateDeliverable = useCallback(async (deliverableId: DeliverableId) => {
+    console.log('Regenerate not yet implemented for:', deliverableId);
+  }, []);
+
+  const exportDocx = useCallback(async (deliverableId: DeliverableId) => {
+    const artifact = state.artifacts.get(deliverableId);
+    if (!artifact || !artifact.validated) return;
+
+    const project = state.selectedProjectId ? getProject(state.selectedProjectId) : null;
+    const projectTitle = project?.title || 'Webinar';
+
+    await generateDocx(deliverableId, artifact.content, projectTitle);
+  }, [state.artifacts, state.selectedProjectId]);
+
+  const exportZip = useCallback(async () => {
+    if (!state.selectedProjectId) return;
+
+    const project = getProject(state.selectedProjectId);
+    if (!project || !project.run_id) return;
+
+    const eligibility = await computeExportEligibility(state.selectedProjectId, project.run_id);
+
+    if (!eligibility.canExport) {
+      setState((s) => ({
+        ...s,
+        error: `Export blocked: ${eligibility.blocking_reasons.join(', ')}`,
+      }));
+      return;
+    }
+
+    const projectTitle = project.title || 'Webinar';
+    const freshArtifacts = await loadAllArtifacts(state.selectedProjectId, project.run_id);
+
+    const exportArtifacts = new Map<DeliverableId, { content: unknown; validated: boolean }>();
+    for (const [id, artifact] of freshArtifacts) {
+      exportArtifacts.set(id, { content: artifact.content, validated: artifact.validated });
+    }
+
+    await generateExportZip(projectTitle, exportArtifacts);
+  }, [state.selectedProjectId]);
+
+  const removeProject = useCallback(async (projectId: string) => {
+    deleteProject(projectId);
+    if (state.selectedProjectId === projectId) {
+      setState((s) => ({ ...s, selectedProjectId: null, artifacts: new Map() }));
+    }
+    await loadProjects();
+  }, [state.selectedProjectId, loadProjects]);
+
+  useEffect(() => {
+    loadProjects();
+  }, [loadProjects]);
+
+  const selectedProject = state.selectedProjectId
+    ? getProject(state.selectedProjectId) || null
+    : null;
+
+  return {
+    ...state,
+    selectedProject,
+    loadProjects,
+    selectProject,
+    createNewProject,
+    runPipeline,
+    editDeliverable,
+    revalidateDeliverable,
+    revalidateAll,
+    regenerateDeliverable,
+    exportDocx,
+    exportZip,
+    removeProject,
+    clearError,
+  };
+}
