@@ -624,10 +624,10 @@ function TransformationSummary({
 
   return (
     <div
-      className="rounded-xl overflow-hidden transition-all hover:shadow-md"
+      className="rounded-xl overflow-hidden transition-all hover:shadow-sm"
       style={{
-        background: 'linear-gradient(135deg, rgb(var(--accent-primary) / 0.06) 0%, rgb(var(--surface-elevated)) 100%)',
-        border: '2px solid rgb(var(--accent-primary) / 0.25)',
+        background: 'rgb(var(--surface-elevated))',
+        border: '1.5px solid rgb(var(--border-default))',
       }}
     >
       <button
