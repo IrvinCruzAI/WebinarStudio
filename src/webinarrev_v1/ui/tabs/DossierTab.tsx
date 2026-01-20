@@ -11,9 +11,24 @@ import {
   AlertTriangle,
   Play,
   Sparkles,
+  Thermometer,
+  Clock,
+  CheckCircle2,
+  Circle,
+  XCircle,
+  Edit3,
+  Check,
+  X,
+  Zap,
+  Info,
+  Settings,
+  Quote,
+  HelpCircle,
 } from 'lucide-react';
-import type { ProjectMetadata, DeliverableId, WR1 } from '../../contracts';
+import type { ProjectMetadata, DeliverableId, WR1, TranscriptData } from '../../contracts';
 import { EditableField, EditableTextArea } from '../components/EditableField';
+import { readTranscript } from '../../store/storageService';
+import { useEffect } from 'react';
 
 interface DossierTabProps {
   project: ProjectMetadata;
@@ -28,7 +43,14 @@ interface DossierTabProps {
   onEditDeliverable: (id: DeliverableId, field: string, value: unknown) => Promise<void>;
 }
 
+interface QAResolution {
+  item: string;
+  status: 'pending' | 'resolved' | 'accepted' | 'needs_input';
+  resolution?: string;
+}
+
 export function DossierTab({
+  project,
   artifacts,
   isPipelineRunning,
   onRunPipeline,
@@ -36,12 +58,29 @@ export function DossierTab({
 }: DossierTabProps) {
   const [viewMode, setViewMode] = useState<'formatted' | 'json'>('formatted');
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(['client', 'webinar', 'themes', 'proof'])
+    new Set(['context', 'summary', 'client', 'webinar', 'themes', 'proof', 'qa'])
   );
+  const [qaResolutions, setQaResolutions] = useState<Map<string, QAResolution>>(new Map());
+  const [operatorNotes, setOperatorNotes] = useState<string>('');
 
   const wr1Artifact = artifacts.get('WR1');
   const wr1 = wr1Artifact?.content as WR1 | undefined;
   const editedFields = wr1?.edited_fields || [];
+
+  useEffect(() => {
+    loadOperatorNotes();
+  }, [project.project_id]);
+
+  const loadOperatorNotes = async () => {
+    try {
+      const transcript = await readTranscript(project.project_id) as TranscriptData | null;
+      if (transcript?.operator_notes) {
+        setOperatorNotes(transcript.operator_notes);
+      }
+    } catch {
+      // Ignore errors
+    }
+  };
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => {
@@ -93,6 +132,37 @@ export function DossierTab({
 
   const isFieldEdited = (fieldPath: string) => editedFields.includes(fieldPath);
 
+  const handleQAResolve = (category: string, index: number, resolution: string) => {
+    const key = `${category}-${index}`;
+    setQaResolutions(prev => {
+      const newMap = new Map(prev);
+      newMap.set(key, {
+        item: wr1?.qa?.[category as keyof typeof wr1.qa]?.[index] || '',
+        status: 'resolved',
+        resolution,
+      });
+      return newMap;
+    });
+  };
+
+  const handleQAAccept = (category: string, index: number) => {
+    const key = `${category}-${index}`;
+    setQaResolutions(prev => {
+      const newMap = new Map(prev);
+      newMap.set(key, {
+        item: wr1?.qa?.[category as keyof typeof wr1.qa]?.[index] || '',
+        status: 'accepted',
+      });
+      return newMap;
+    });
+  };
+
+  const getQAResolution = (category: string, index: number): QAResolution | undefined => {
+    return qaResolutions.get(`${category}-${index}`);
+  };
+
+  const completenessScore = calculateCompleteness(wr1, qaResolutions);
+
   if (!wr1) {
     return (
       <div className="flex-1 overflow-auto p-6">
@@ -140,7 +210,8 @@ export function DossierTab({
               WR1 - Strategy foundation for all deliverables
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <CompletenessRing score={completenessScore} />
             <button
               onClick={() => setViewMode(viewMode === 'formatted' ? 'json' : 'formatted')}
               className="btn-ghost text-sm"
@@ -164,54 +235,69 @@ export function DossierTab({
           <JsonViewer content={wr1} />
         ) : (
           <>
+            <IntakeContextBanner project={project} operatorNotes={operatorNotes} />
+
+            <TransformationSummary
+              wr1={wr1}
+              project={project}
+              expanded={expandedSections.has('summary')}
+              onToggle={() => toggleSection('summary')}
+              onRunPipeline={onRunPipeline}
+              isPipelineRunning={isPipelineRunning}
+            />
+
             <DossierSection
               id="client"
               title="Client & Speaker"
               icon={User}
               expanded={expandedSections.has('client')}
               onToggle={() => toggleSection('client')}
+              completeness={getClientCompleteness(wr1)}
             >
               <div className="grid grid-cols-2 gap-4">
-                <EditableField
+                <FieldWithConfidence
                   label="Client Name"
                   value={wr1.parsed_intake.client_name}
                   fieldPath="parsed_intake.client_name"
                   isEdited={isFieldEdited('parsed_intake.client_name')}
                   onSave={handleFieldSave}
                   onRevert={handleFieldRevert}
+                  confidence={wr1.parsed_intake.client_name ? 'high' : 'missing'}
+                  source={wr1.parsed_intake.client_name ? 'extracted' : undefined}
+                  critical
                 />
-                <EditableField
+                <FieldWithConfidence
                   label="Company"
                   value={wr1.parsed_intake.company}
                   fieldPath="parsed_intake.company"
                   isEdited={isFieldEdited('parsed_intake.company')}
                   onSave={handleFieldSave}
                   onRevert={handleFieldRevert}
+                  confidence={wr1.parsed_intake.company ? 'high' : 'low'}
+                  source={wr1.parsed_intake.company ? 'extracted' : 'inferred'}
                 />
-                <EditableField
+                <FieldWithConfidence
                   label="Speaker Name"
                   value={wr1.parsed_intake.speaker_name}
                   fieldPath="parsed_intake.speaker_name"
                   isEdited={isFieldEdited('parsed_intake.speaker_name')}
                   onSave={handleFieldSave}
                   onRevert={handleFieldRevert}
+                  confidence={wr1.parsed_intake.speaker_name ? 'high' : 'low'}
+                  source={wr1.parsed_intake.speaker_name ? 'extracted' : undefined}
                 />
-                <EditableField
+                <FieldWithConfidence
                   label="Speaker Title"
                   value={wr1.parsed_intake.speaker_title}
                   fieldPath="parsed_intake.speaker_title"
                   isEdited={isFieldEdited('parsed_intake.speaker_title')}
                   onSave={handleFieldSave}
                   onRevert={handleFieldRevert}
+                  confidence={wr1.parsed_intake.speaker_title ? 'medium' : 'low'}
+                  source={wr1.parsed_intake.speaker_title ? 'inferred' : undefined}
                 />
               </div>
             </DossierSection>
-
-            <ExecutiveSummaryHero
-              summary={wr1.executive_summary}
-              onRunPipeline={onRunPipeline}
-              isPipelineRunning={isPipelineRunning}
-            />
 
             <DossierSection
               id="webinar"
@@ -219,6 +305,7 @@ export function DossierTab({
               icon={Lightbulb}
               expanded={expandedSections.has('webinar')}
               onToggle={() => toggleSection('webinar')}
+              completeness={getWebinarCompleteness(wr1)}
             >
               <div className="space-y-4">
                 <EditableTextArea
@@ -265,15 +352,15 @@ export function DossierTab({
               icon={Target}
               expanded={expandedSections.has('audience')}
               onToggle={() => toggleSection('audience')}
+              completeness={wr1.parsed_intake.target_audience ? 100 : 0}
+              highlight="strategic"
             >
-              <EditableTextArea
-                label="Target Audience"
-                value={wr1.parsed_intake.target_audience}
-                fieldPath="parsed_intake.target_audience"
-                isEdited={isFieldEdited('parsed_intake.target_audience')}
+              <AudienceSection
+                targetAudience={wr1.parsed_intake.target_audience}
+                audienceTemperature={project.settings.audience_temperature}
                 onSave={handleFieldSave}
                 onRevert={handleFieldRevert}
-                rows={3}
+                isEdited={isFieldEdited('parsed_intake.target_audience')}
               />
             </DossierSection>
 
@@ -283,9 +370,10 @@ export function DossierTab({
               icon={Lightbulb}
               expanded={expandedSections.has('themes')}
               onToggle={() => toggleSection('themes')}
+              completeness={getThemesCompleteness(wr1)}
             >
               <div className="space-y-4">
-                <ArrayDisplay label="Main Themes" items={wr1.main_themes} />
+                <ArrayDisplay label="Main Themes" items={wr1.main_themes} highlight />
                 <ArrayDisplay label="Structured Notes" items={wr1.structured_notes} />
                 <ArrayDisplay label="Speaker Insights" items={wr1.speaker_insights} />
               </div>
@@ -297,33 +385,31 @@ export function DossierTab({
               icon={Shield}
               expanded={expandedSections.has('proof')}
               onToggle={() => toggleSection('proof')}
+              completeness={getProofCompleteness(wr1)}
+              highlight="proof"
             >
-              {wr1.proof_points.length > 0 ? (
-                <div className="space-y-3">
-                  {wr1.proof_points.map((proof, index) => (
-                    <ProofPointCard key={index} proof={proof} />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm italic" style={{ color: 'rgb(var(--text-muted))' }}>
-                  No proof points extracted
-                </p>
-              )}
+              <ProofVaultSection proofPoints={wr1.proof_points} />
             </DossierSection>
 
             <DossierSection
               id="qa"
-              title="QA Report (Operator View)"
+              title="Quality Assurance"
               icon={AlertTriangle}
               expanded={expandedSections.has('qa')}
               onToggle={() => toggleSection('qa')}
+              completeness={getQACompleteness(wr1, qaResolutions)}
+              highlight="qa"
             >
-              <div className="space-y-4">
-                <QAArrayDisplay label="Assumptions" items={wr1.qa.assumptions} type="warning" />
-                <QAArrayDisplay label="Placeholders" items={wr1.qa.placeholders} type="error" />
-                <QAArrayDisplay label="Claims Requiring Proof" items={wr1.qa.claims_requiring_proof} type="info" />
-              </div>
+              <ActionableQASection
+                qa={wr1.qa}
+                resolutions={qaResolutions}
+                onResolve={handleQAResolve}
+                onAccept={handleQAAccept}
+                getResolution={getQAResolution}
+              />
             </DossierSection>
+
+            <GapAnalysis wr1={wr1} project={project} qaResolutions={qaResolutions} />
           </>
         )}
       </div>
@@ -331,107 +417,383 @@ export function DossierTab({
   );
 }
 
-interface ExecutiveSummaryHeroProps {
-  summary?: { overview: string; key_points: string[] };
+function CompletenessRing({ score }: { score: number }) {
+  const circumference = 2 * Math.PI * 18;
+  const strokeDashoffset = circumference - (score / 100) * circumference;
+
+  const getColor = () => {
+    if (score >= 85) return 'rgb(var(--success))';
+    if (score >= 60) return 'rgb(var(--warning))';
+    return 'rgb(var(--error))';
+  };
+
+  return (
+    <div className="relative w-12 h-12 flex items-center justify-center">
+      <svg className="w-12 h-12 transform -rotate-90">
+        <circle
+          cx="24"
+          cy="24"
+          r="18"
+          fill="none"
+          stroke="rgb(var(--border-default))"
+          strokeWidth="3"
+        />
+        <circle
+          cx="24"
+          cy="24"
+          r="18"
+          fill="none"
+          stroke={getColor()}
+          strokeWidth="3"
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          strokeLinecap="round"
+          className="transition-all duration-500"
+        />
+      </svg>
+      <span
+        className="absolute text-xs font-bold"
+        style={{ color: getColor() }}
+      >
+        {score}%
+      </span>
+    </div>
+  );
+}
+
+interface IntakeContextBannerProps {
+  project: ProjectMetadata;
+  operatorNotes: string;
+}
+
+function IntakeContextBanner({ project, operatorNotes }: IntakeContextBannerProps) {
+  const [showNotes, setShowNotes] = useState(false);
+
+  const tempLabels = {
+    cold: { label: 'Cold Audience', desc: 'Needs education', color: '--accent-secondary' },
+    warm: { label: 'Warm Audience', desc: 'Exploring solutions', color: '--warning' },
+    hot: { label: 'Hot Audience', desc: 'Ready to act', color: '--error' },
+  };
+
+  const ctaLabels = {
+    book_call: { label: 'Book a Call', desc: 'High-touch conversion' },
+    buy_now: { label: 'Direct Purchase', desc: 'Lower-friction conversion' },
+  };
+
+  const temp = tempLabels[project.settings.audience_temperature];
+  const cta = ctaLabels[project.settings.cta_mode];
+
+  return (
+    <div
+      className="rounded-2xl p-4"
+      style={{
+        background: 'rgb(var(--surface-elevated))',
+        border: '1px solid rgb(var(--border-default))',
+      }}
+    >
+      <div className="flex items-center gap-2 mb-3">
+        <Settings className="w-4 h-4" style={{ color: 'rgb(var(--text-muted))' }} />
+        <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'rgb(var(--text-muted))' }}>
+          Generation Context
+        </span>
+        <span className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+          (from intake)
+        </span>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <div className="flex items-center gap-3">
+          <div
+            className="p-2 rounded-lg"
+            style={{ background: `rgb(var(${temp.color}) / 0.1)` }}
+          >
+            <Thermometer className="w-4 h-4" style={{ color: `rgb(var(${temp.color}))` }} />
+          </div>
+          <div>
+            <p className="text-sm font-medium" style={{ color: 'rgb(var(--text-primary))' }}>
+              {temp.label}
+            </p>
+            <p className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+              {temp.desc}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div
+            className="p-2 rounded-lg"
+            style={{ background: 'rgb(var(--accent-primary) / 0.1)' }}
+          >
+            <Target className="w-4 h-4" style={{ color: 'rgb(var(--accent-primary))' }} />
+          </div>
+          <div>
+            <p className="text-sm font-medium" style={{ color: 'rgb(var(--text-primary))' }}>
+              {cta.label}
+            </p>
+            <p className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+              {cta.desc}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div
+            className="p-2 rounded-lg"
+            style={{ background: 'rgb(var(--surface-base))' }}
+          >
+            <Clock className="w-4 h-4" style={{ color: 'rgb(var(--text-muted))' }} />
+          </div>
+          <div>
+            <p className="text-sm font-medium" style={{ color: 'rgb(var(--text-primary))' }}>
+              {project.settings.webinar_length_minutes} Minutes
+            </p>
+            <p className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+              Target duration
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {operatorNotes && (
+        <div className="mt-4 pt-4 border-t" style={{ borderColor: 'rgb(var(--border-subtle))' }}>
+          <button
+            onClick={() => setShowNotes(!showNotes)}
+            className="flex items-center gap-2 text-sm font-medium w-full"
+            style={{ color: 'rgb(var(--text-secondary))' }}
+          >
+            <Info className="w-4 h-4" style={{ color: 'rgb(var(--accent-primary))' }} />
+            Operator Notes
+            {showNotes ? (
+              <ChevronDown className="w-4 h-4 ml-auto" />
+            ) : (
+              <ChevronRight className="w-4 h-4 ml-auto" />
+            )}
+          </button>
+          {showNotes && (
+            <p
+              className="mt-2 text-sm p-3 rounded-lg"
+              style={{
+                background: 'rgb(var(--surface-base))',
+                color: 'rgb(var(--text-secondary))',
+                whiteSpace: 'pre-wrap',
+              }}
+            >
+              {operatorNotes}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface TransformationSummaryProps {
+  wr1: WR1;
+  project: ProjectMetadata;
+  expanded: boolean;
+  onToggle: () => void;
   onRunPipeline: () => void;
   isPipelineRunning: boolean;
 }
 
-function ExecutiveSummaryHero({ summary, onRunPipeline, isPipelineRunning }: ExecutiveSummaryHeroProps) {
-  if (!summary) {
-    return (
-      <div
-        className="rounded-2xl p-6"
-        style={{
-          background: 'linear-gradient(135deg, rgb(var(--surface-elevated)) 0%, rgb(var(--surface-base)) 100%)',
-          border: '1px solid rgb(var(--border-default))',
-        }}
-      >
-        <div className="flex items-start gap-4">
-          <div
-            className="p-3 rounded-xl"
-            style={{ background: 'rgb(var(--accent-primary) / 0.1)' }}
-          >
-            <Sparkles className="w-6 h-6" style={{ color: 'rgb(var(--accent-primary))' }} />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-lg font-semibold mb-1" style={{ color: 'rgb(var(--text-primary))' }}>
-              Executive Summary
-            </h3>
-            <p className="text-sm mb-4" style={{ color: 'rgb(var(--text-muted))' }}>
-              Run the pipeline to generate an executive summary with key strategic insights
-            </p>
-            <button
-              onClick={onRunPipeline}
-              disabled={isPipelineRunning}
-              className="btn-ghost text-sm"
-            >
-              <Play className="w-4 h-4" />
-              Regenerate to Add Summary
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+function TransformationSummary({
+  wr1,
+  project,
+  expanded,
+  onToggle,
+  onRunPipeline,
+  isPipelineRunning,
+}: TransformationSummaryProps) {
+  const summary = wr1.executive_summary;
 
   return (
     <div
-      className="rounded-2xl p-6"
+      className="rounded-2xl overflow-hidden"
       style={{
-        background: 'linear-gradient(135deg, rgb(var(--accent-primary) / 0.05) 0%, rgb(var(--surface-elevated)) 100%)',
-        border: '1px solid rgb(var(--accent-primary) / 0.2)',
+        background: 'linear-gradient(135deg, rgb(var(--accent-primary) / 0.08) 0%, rgb(var(--surface-elevated)) 100%)',
+        border: '2px solid rgb(var(--accent-primary) / 0.2)',
       }}
     >
-      <div className="flex items-start gap-4">
-        <div
-          className="p-3 rounded-xl flex-shrink-0"
-          style={{ background: 'rgb(var(--accent-primary) / 0.1)' }}
-        >
-          <Sparkles className="w-6 h-6" style={{ color: 'rgb(var(--accent-primary))' }} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <h3 className="text-lg font-semibold mb-3" style={{ color: 'rgb(var(--text-primary))' }}>
-            Executive Summary
-          </h3>
-          <p
-            className="text-sm leading-relaxed mb-4"
-            style={{ color: 'rgb(var(--text-secondary))' }}
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between p-5 hover:bg-[rgb(var(--surface-glass))] transition-colors"
+      >
+        <div className="flex items-center gap-4">
+          <div
+            className="p-3 rounded-xl"
+            style={{ background: 'rgb(var(--accent-primary) / 0.15)' }}
           >
-            {summary.overview}
-          </p>
-          {summary.key_points.length > 0 && (
-            <div className="space-y-2">
-              <span
-                className="text-xs font-medium uppercase tracking-wide"
-                style={{ color: 'rgb(var(--text-muted))' }}
+            <Sparkles className="w-6 h-6" style={{ color: 'rgb(var(--accent-primary))' }} />
+          </div>
+          <div className="text-left">
+            <h3 className="text-lg font-bold" style={{ color: 'rgb(var(--text-primary))' }}>
+              Strategic Summary
+            </h3>
+            <p className="text-sm" style={{ color: 'rgb(var(--text-muted))' }}>
+              What this webinar is about and why the audience should care
+            </p>
+          </div>
+        </div>
+        {expanded ? (
+          <ChevronDown className="w-5 h-5" style={{ color: 'rgb(var(--text-muted))' }} />
+        ) : (
+          <ChevronRight className="w-5 h-5" style={{ color: 'rgb(var(--text-muted))' }} />
+        )}
+      </button>
+
+      {expanded && (
+        <div className="px-5 pb-5">
+          {!summary ? (
+            <div className="text-center py-8">
+              <p className="text-sm mb-4" style={{ color: 'rgb(var(--text-muted))' }}>
+                Run the pipeline to generate a strategic summary
+              </p>
+              <button
+                onClick={onRunPipeline}
+                disabled={isPipelineRunning}
+                className="btn-ghost text-sm"
               >
-                Key Strategic Points
-              </span>
-              <ul className="space-y-2">
-                {summary.key_points.map((point, index) => (
-                  <li
-                    key={index}
-                    className="flex items-start gap-2 text-sm"
-                    style={{ color: 'rgb(var(--text-secondary))' }}
+                <Play className="w-4 h-4" />
+                Generate Summary
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div
+                className="p-4 rounded-xl"
+                style={{
+                  background: 'rgb(var(--surface-base))',
+                  border: '1px solid rgb(var(--border-subtle))',
+                }}
+              >
+                <p
+                  className="text-base leading-relaxed"
+                  style={{ color: 'rgb(var(--text-primary))' }}
+                >
+                  {summary.overview}
+                </p>
+              </div>
+
+              {summary.key_points.length > 0 && (
+                <div>
+                  <h4
+                    className="text-xs font-semibold uppercase tracking-wide mb-3"
+                    style={{ color: 'rgb(var(--text-muted))' }}
                   >
-                    <span
-                      className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0 mt-0.5"
-                      style={{
-                        background: 'rgb(var(--accent-primary) / 0.1)',
-                        color: 'rgb(var(--accent-primary))',
-                      }}
-                    >
-                      {index + 1}
-                    </span>
-                    {point}
-                  </li>
-                ))}
-              </ul>
+                    Key Strategic Points
+                  </h4>
+                  <div className="grid gap-2">
+                    {summary.key_points.map((point, index) => (
+                      <div
+                        key={index}
+                        className="flex items-start gap-3 p-3 rounded-xl"
+                        style={{
+                          background: 'rgb(var(--surface-base))',
+                          border: '1px solid rgb(var(--border-subtle))',
+                        }}
+                      >
+                        <span
+                          className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                          style={{
+                            background: 'rgb(var(--accent-primary) / 0.15)',
+                            color: 'rgb(var(--accent-primary))',
+                          }}
+                        >
+                          {index + 1}
+                        </span>
+                        <p className="text-sm" style={{ color: 'rgb(var(--text-secondary))' }}>
+                          {point}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <StrategicImplications
+                audienceTemp={project.settings.audience_temperature}
+                ctaMode={project.settings.cta_mode}
+                themes={wr1.main_themes}
+              />
             </div>
           )}
         </div>
-      </div>
+      )}
+    </div>
+  );
+}
+
+interface StrategicImplicationsProps {
+  audienceTemp: string;
+  ctaMode: string;
+  themes: string[];
+}
+
+function StrategicImplications({ audienceTemp, ctaMode, themes }: StrategicImplicationsProps) {
+  const implications = [];
+
+  if (audienceTemp === 'cold') {
+    implications.push({
+      icon: Thermometer,
+      text: 'Cold audience means extra education is needed. The Opening Hook and Problem Amplification phases should be extended.',
+      type: 'info',
+    });
+  } else if (audienceTemp === 'hot') {
+    implications.push({
+      icon: Zap,
+      text: 'Hot audience is ready to act. Move quickly to the offer and minimize educational content.',
+      type: 'success',
+    });
+  }
+
+  if (ctaMode === 'book_call') {
+    implications.push({
+      icon: Target,
+      text: 'Book-a-call CTA requires building trust and demonstrating expertise. Include more case studies and testimonials.',
+      type: 'info',
+    });
+  }
+
+  if (themes.length < 3) {
+    implications.push({
+      icon: AlertTriangle,
+      text: 'Only ' + themes.length + ' main themes identified. Consider expanding content depth for a more comprehensive webinar.',
+      type: 'warning',
+    });
+  }
+
+  if (implications.length === 0) return null;
+
+  return (
+    <div
+      className="p-4 rounded-xl"
+      style={{
+        background: 'rgb(var(--accent-primary) / 0.05)',
+        border: '1px solid rgb(var(--accent-primary) / 0.1)',
+      }}
+    >
+      <h4
+        className="text-xs font-semibold uppercase tracking-wide mb-3 flex items-center gap-2"
+        style={{ color: 'rgb(var(--accent-primary))' }}
+      >
+        <Lightbulb className="w-4 h-4" />
+        What This Means for Your Webinar
+      </h4>
+      <ul className="space-y-2">
+        {implications.map((imp, i) => (
+          <li key={i} className="flex items-start gap-2 text-sm" style={{ color: 'rgb(var(--text-secondary))' }}>
+            <imp.icon
+              className="w-4 h-4 flex-shrink-0 mt-0.5"
+              style={{
+                color: imp.type === 'warning' ? 'rgb(var(--warning))' :
+                       imp.type === 'success' ? 'rgb(var(--success))' :
+                       'rgb(var(--accent-primary))'
+              }}
+            />
+            {imp.text}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -443,17 +805,46 @@ interface DossierSectionProps {
   expanded: boolean;
   onToggle: () => void;
   children: React.ReactNode;
+  completeness?: number;
+  highlight?: 'strategic' | 'proof' | 'qa';
 }
 
-function DossierSection({ title, icon: Icon, expanded, onToggle, children }: DossierSectionProps) {
+function DossierSection({
+  title,
+  icon: Icon,
+  expanded,
+  onToggle,
+  children,
+  completeness,
+  highlight,
+}: DossierSectionProps) {
+  const getHighlightStyle = () => {
+    switch (highlight) {
+      case 'strategic':
+        return {
+          background: 'rgb(var(--accent-primary) / 0.03)',
+          border: '1px solid rgb(var(--accent-primary) / 0.15)',
+        };
+      case 'proof':
+        return {
+          background: 'rgb(var(--success) / 0.03)',
+          border: '1px solid rgb(var(--success) / 0.15)',
+        };
+      case 'qa':
+        return {
+          background: 'rgb(var(--warning) / 0.03)',
+          border: '1px solid rgb(var(--warning) / 0.15)',
+        };
+      default:
+        return {
+          background: 'rgb(var(--surface-elevated))',
+          border: '1px solid rgb(var(--border-default))',
+        };
+    }
+  };
+
   return (
-    <div
-      className="rounded-2xl overflow-hidden"
-      style={{
-        background: 'rgb(var(--surface-elevated))',
-        border: '1px solid rgb(var(--border-default))',
-      }}
-    >
+    <div className="rounded-2xl overflow-hidden" style={getHighlightStyle()}>
       <button
         onClick={onToggle}
         className="w-full flex items-center justify-between p-4 hover:bg-[rgb(var(--surface-glass))] transition-colors"
@@ -468,6 +859,9 @@ function DossierSection({ title, icon: Icon, expanded, onToggle, children }: Dos
           <span className="font-semibold" style={{ color: 'rgb(var(--text-primary))' }}>
             {title}
           </span>
+          {completeness !== undefined && (
+            <CompletenessChip value={completeness} />
+          )}
         </div>
         {expanded ? (
           <ChevronDown className="w-5 h-5" style={{ color: 'rgb(var(--text-muted))' }} />
@@ -484,7 +878,163 @@ function DossierSection({ title, icon: Icon, expanded, onToggle, children }: Dos
   );
 }
 
-function ArrayDisplay({ label, items }: { label: string; items: string[] }) {
+function CompletenessChip({ value }: { value: number }) {
+  const getStyle = () => {
+    if (value >= 100) {
+      return { bg: 'rgb(var(--success) / 0.1)', color: 'rgb(var(--success))' };
+    }
+    if (value >= 60) {
+      return { bg: 'rgb(var(--warning) / 0.1)', color: 'rgb(var(--warning))' };
+    }
+    return { bg: 'rgb(var(--error) / 0.1)', color: 'rgb(var(--error))' };
+  };
+
+  const style = getStyle();
+
+  return (
+    <span
+      className="text-xs font-medium px-2 py-0.5 rounded-full"
+      style={{ background: style.bg, color: style.color }}
+    >
+      {value >= 100 ? 'Complete' : `${value}%`}
+    </span>
+  );
+}
+
+interface FieldWithConfidenceProps {
+  label: string;
+  value: string | null;
+  fieldPath: string;
+  isEdited: boolean;
+  onSave: (path: string, value: string | null) => Promise<void>;
+  onRevert: (path: string) => Promise<void>;
+  confidence: 'high' | 'medium' | 'low' | 'missing';
+  source?: 'extracted' | 'inferred';
+  critical?: boolean;
+}
+
+function FieldWithConfidence({
+  label,
+  value,
+  fieldPath,
+  isEdited,
+  onSave,
+  onRevert,
+  confidence,
+  source,
+  critical,
+}: FieldWithConfidenceProps) {
+  const confidenceStyles = {
+    high: { icon: CheckCircle2, color: 'rgb(var(--success))', label: 'Confident' },
+    medium: { icon: Circle, color: 'rgb(var(--warning))', label: 'Verify' },
+    low: { icon: HelpCircle, color: 'rgb(var(--error))', label: 'Needs review' },
+    missing: { icon: XCircle, color: 'rgb(var(--error))', label: 'Missing' },
+  };
+
+  const conf = confidenceStyles[confidence];
+  const ConfIcon = conf.icon;
+
+  return (
+    <div className="relative">
+      <EditableField
+        label={label}
+        value={value}
+        fieldPath={fieldPath}
+        isEdited={isEdited}
+        onSave={onSave}
+        onRevert={onRevert}
+      />
+      <div className="flex items-center gap-2 mt-1">
+        <div className="flex items-center gap-1">
+          <ConfIcon className="w-3 h-3" style={{ color: conf.color }} />
+          <span className="text-xs" style={{ color: conf.color }}>
+            {conf.label}
+          </span>
+        </div>
+        {source && (
+          <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgb(var(--surface-base))', color: 'rgb(var(--text-muted))' }}>
+            {source === 'extracted' ? 'From transcript' : 'AI inferred'}
+          </span>
+        )}
+        {critical && !value && (
+          <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgb(var(--error) / 0.1)', color: 'rgb(var(--error))' }}>
+            Required
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface AudienceSectionProps {
+  targetAudience: string | null;
+  audienceTemperature: string;
+  onSave: (path: string, value: string | null) => Promise<void>;
+  onRevert: (path: string) => Promise<void>;
+  isEdited: boolean;
+}
+
+function AudienceSection({
+  targetAudience,
+  audienceTemperature,
+  onSave,
+  onRevert,
+  isEdited,
+}: AudienceSectionProps) {
+  const tempInfo = {
+    cold: {
+      label: 'Cold',
+      desc: 'This audience is unfamiliar with the problem. Content should start with education and awareness.',
+      color: '--accent-secondary',
+    },
+    warm: {
+      label: 'Warm',
+      desc: 'This audience knows the problem exists. Content should focus on your unique solution.',
+      color: '--warning',
+    },
+    hot: {
+      label: 'Hot',
+      desc: 'This audience is ready to buy. Content should emphasize urgency and clear next steps.',
+      color: '--error',
+    },
+  };
+
+  const temp = tempInfo[audienceTemperature as keyof typeof tempInfo] || tempInfo.warm;
+
+  return (
+    <div className="space-y-4">
+      <div
+        className="p-4 rounded-xl flex items-start gap-4"
+        style={{
+          background: `rgb(var(${temp.color}) / 0.05)`,
+          border: `1px solid rgb(var(${temp.color}) / 0.15)`,
+        }}
+      >
+        <Thermometer className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: `rgb(var(${temp.color}))` }} />
+        <div>
+          <p className="text-sm font-semibold" style={{ color: 'rgb(var(--text-primary))' }}>
+            {temp.label} Audience Configuration
+          </p>
+          <p className="text-sm mt-1" style={{ color: 'rgb(var(--text-secondary))' }}>
+            {temp.desc}
+          </p>
+        </div>
+      </div>
+
+      <EditableTextArea
+        label="Target Audience Description"
+        value={targetAudience}
+        fieldPath="parsed_intake.target_audience"
+        isEdited={isEdited}
+        onSave={onSave}
+        onRevert={onRevert}
+        rows={3}
+      />
+    </div>
+  );
+}
+
+function ArrayDisplay({ label, items, highlight }: { label: string; items: string[]; highlight?: boolean }) {
   if (!items || items.length === 0) {
     return (
       <div>
@@ -500,8 +1050,11 @@ function ArrayDisplay({ label, items }: { label: string; items: string[] }) {
 
   return (
     <div>
-      <label className="text-xs font-medium uppercase tracking-wide" style={{ color: 'rgb(var(--text-muted))' }}>
+      <label className="text-xs font-medium uppercase tracking-wide flex items-center gap-2" style={{ color: 'rgb(var(--text-muted))' }}>
         {label}
+        <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgb(var(--surface-base))' }}>
+          {items.length}
+        </span>
       </label>
       <div className="flex flex-wrap gap-2 mt-2">
         {items.map((item, i) => (
@@ -509,9 +1062,10 @@ function ArrayDisplay({ label, items }: { label: string; items: string[] }) {
             key={i}
             className="px-3 py-1.5 text-sm rounded-lg"
             style={{
-              background: 'rgb(var(--surface-base))',
-              color: 'rgb(var(--text-secondary))',
-              border: '1px solid rgb(var(--border-subtle))',
+              background: highlight ? 'rgb(var(--accent-primary) / 0.1)' : 'rgb(var(--surface-base))',
+              color: highlight ? 'rgb(var(--accent-primary))' : 'rgb(var(--text-secondary))',
+              border: highlight ? '1px solid rgb(var(--accent-primary) / 0.2)' : '1px solid rgb(var(--border-subtle))',
+              fontWeight: highlight ? 500 : 400,
             }}
           >
             {item}
@@ -522,101 +1076,576 @@ function ArrayDisplay({ label, items }: { label: string; items: string[] }) {
   );
 }
 
-function QAArrayDisplay({
-  label,
-  items,
-  type,
-}: {
-  label: string;
-  items: string[];
-  type: 'warning' | 'error' | 'info';
-}) {
-  const colors = {
-    warning: { bg: 'rgb(var(--warning) / 0.1)', border: 'rgb(var(--warning) / 0.2)', text: 'rgb(var(--warning))' },
-    error: { bg: 'rgb(var(--error) / 0.1)', border: 'rgb(var(--error) / 0.2)', text: 'rgb(var(--error))' },
-    info: { bg: 'rgb(var(--accent-primary) / 0.1)', border: 'rgb(var(--accent-primary) / 0.2)', text: 'rgb(var(--accent-primary))' },
+interface ProofVaultSectionProps {
+  proofPoints: Array<{ type: string; content: string; source: string | null }>;
+}
+
+function ProofVaultSection({ proofPoints }: ProofVaultSectionProps) {
+  if (!proofPoints || proofPoints.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <Shield className="w-12 h-12 mx-auto mb-3" style={{ color: 'rgb(var(--text-muted))' }} />
+        <p className="text-sm font-medium mb-1" style={{ color: 'rgb(var(--text-primary))' }}>
+          No Proof Points Found
+        </p>
+        <p className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+          Add testimonials, metrics, or case studies to strengthen credibility
+        </p>
+      </div>
+    );
+  }
+
+  const grouped = {
+    testimonial: proofPoints.filter(p => p.type === 'testimonial'),
+    metric: proofPoints.filter(p => p.type === 'metric'),
+    case_study: proofPoints.filter(p => p.type === 'case_study'),
   };
 
-  const color = colors[type];
+  const needsSource = proofPoints.filter(p => !p.source).length;
 
   return (
-    <div>
-      <div className="flex items-center gap-2 mb-2">
-        <label className="text-xs font-medium uppercase tracking-wide" style={{ color: 'rgb(var(--text-muted))' }}>
-          {label}
-        </label>
-        {items.length > 0 && (
-          <span
-            className="text-xs px-1.5 py-0.5 rounded"
-            style={{ background: color.bg, color: color.text }}
-          >
-            {items.length}
+    <div className="space-y-4">
+      {needsSource > 0 && (
+        <div
+          className="p-3 rounded-xl flex items-center gap-3"
+          style={{
+            background: 'rgb(var(--warning) / 0.1)',
+            border: '1px solid rgb(var(--warning) / 0.2)',
+          }}
+        >
+          <AlertTriangle className="w-4 h-4" style={{ color: 'rgb(var(--warning))' }} />
+          <span className="text-sm" style={{ color: 'rgb(var(--text-secondary))' }}>
+            {needsSource} proof point{needsSource > 1 ? 's' : ''} need source attribution
           </span>
-        )}
-      </div>
-      {items.length > 0 ? (
-        <ul className="space-y-1">
-          {items.map((item, i) => (
-            <li
-              key={i}
-              className="text-sm p-2 rounded-lg"
-              style={{
-                background: color.bg,
-                border: `1px solid ${color.border}`,
-                color: 'rgb(var(--text-secondary))',
-              }}
-            >
-              {item}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-sm" style={{ color: 'rgb(var(--text-muted))' }}>
-          None detected
-        </p>
+        </div>
       )}
+
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        {[
+          { type: 'testimonial', label: 'Testimonials', color: '--success' },
+          { type: 'metric', label: 'Metrics', color: '--accent-primary' },
+          { type: 'case_study', label: 'Case Studies', color: '--warning' },
+        ].map(({ type, label, color }) => (
+          <div
+            key={type}
+            className="p-3 rounded-xl text-center"
+            style={{
+              background: `rgb(var(${color}) / 0.05)`,
+              border: `1px solid rgb(var(${color}) / 0.15)`,
+            }}
+          >
+            <p className="text-2xl font-bold" style={{ color: `rgb(var(${color}))` }}>
+              {grouped[type as keyof typeof grouped].length}
+            </p>
+            <p className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>{label}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="space-y-3">
+        {proofPoints.map((proof, index) => (
+          <ProofPointCard key={index} proof={proof} />
+        ))}
+      </div>
     </div>
   );
 }
 
 function ProofPointCard({ proof }: { proof: { type: string; content: string; source: string | null } }) {
-  const typeColors: Record<string, { bg: string; text: string }> = {
-    testimonial: { bg: 'rgb(var(--success) / 0.1)', text: 'rgb(var(--success))' },
-    metric: { bg: 'rgb(var(--accent-primary) / 0.1)', text: 'rgb(var(--accent-primary))' },
-    case_study: { bg: 'rgb(var(--warning) / 0.1)', text: 'rgb(var(--warning))' },
+  const typeConfig: Record<string, { bg: string; text: string; icon: typeof Quote }> = {
+    testimonial: { bg: 'rgb(var(--success) / 0.1)', text: 'rgb(var(--success))', icon: Quote },
+    metric: { bg: 'rgb(var(--accent-primary) / 0.1)', text: 'rgb(var(--accent-primary))', icon: Target },
+    case_study: { bg: 'rgb(var(--warning) / 0.1)', text: 'rgb(var(--warning))', icon: FileText },
   };
 
-  const colors = typeColors[proof.type] || typeColors.testimonial;
+  const config = typeConfig[proof.type] || typeConfig.testimonial;
 
   return (
     <div
       className="p-4 rounded-xl"
       style={{
         background: 'rgb(var(--surface-base))',
-        border: '1px solid rgb(var(--border-subtle))',
+        border: proof.source ? '1px solid rgb(var(--border-subtle))' : '1px solid rgb(var(--warning) / 0.3)',
       }}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1">
-          <span
-            className="inline-block text-xs font-medium px-2 py-0.5 rounded-full mb-2"
-            style={{ background: colors.bg, color: colors.text }}
-          >
-            {proof.type.replace('_', ' ')}
-          </span>
+      <div className="flex items-start gap-3">
+        <div
+          className="p-1.5 rounded-lg flex-shrink-0"
+          style={{ background: config.bg }}
+        >
+          <config.icon className="w-3.5 h-3.5" style={{ color: config.text }} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-2">
+            <span
+              className="text-xs font-medium px-2 py-0.5 rounded-full capitalize"
+              style={{ background: config.bg, color: config.text }}
+            >
+              {proof.type.replace('_', ' ')}
+            </span>
+            {!proof.source && (
+              <span
+                className="text-xs px-2 py-0.5 rounded-full"
+                style={{ background: 'rgb(var(--warning) / 0.1)', color: 'rgb(var(--warning))' }}
+              >
+                Source needed
+              </span>
+            )}
+          </div>
           <p className="text-sm" style={{ color: 'rgb(var(--text-primary))' }}>
             {proof.content}
           </p>
-          {proof.source ? (
-            <p className="text-xs mt-2" style={{ color: 'rgb(var(--text-muted))' }}>
+          {proof.source && (
+            <p className="text-xs mt-2 flex items-center gap-1" style={{ color: 'rgb(var(--text-muted))' }}>
+              <CheckCircle2 className="w-3 h-3" style={{ color: 'rgb(var(--success))' }} />
               Source: {proof.source}
-            </p>
-          ) : (
-            <p className="text-xs mt-2 italic" style={{ color: 'rgb(var(--warning))' }}>
-              Source needed
             </p>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+interface ActionableQASectionProps {
+  qa: { assumptions: string[]; placeholders: string[]; claims_requiring_proof: string[] };
+  resolutions: Map<string, QAResolution>;
+  onResolve: (category: string, index: number, resolution: string) => void;
+  onAccept: (category: string, index: number) => void;
+  getResolution: (category: string, index: number) => QAResolution | undefined;
+}
+
+function ActionableQASection({
+  qa,
+  resolutions,
+  onResolve,
+  onAccept,
+  getResolution,
+}: ActionableQASectionProps) {
+  const totalIssues = qa.assumptions.length + qa.placeholders.length + qa.claims_requiring_proof.length;
+  const resolvedCount = Array.from(resolutions.values()).filter(r => r.status === 'resolved' || r.status === 'accepted').length;
+
+  if (totalIssues === 0) {
+    return (
+      <div className="text-center py-8">
+        <CheckCircle2 className="w-12 h-12 mx-auto mb-3" style={{ color: 'rgb(var(--success))' }} />
+        <p className="text-sm font-medium mb-1" style={{ color: 'rgb(var(--text-primary))' }}>
+          No Quality Issues Detected
+        </p>
+        <p className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+          The dossier passed all automated quality checks
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div
+        className="p-4 rounded-xl flex items-center justify-between"
+        style={{
+          background: resolvedCount === totalIssues ? 'rgb(var(--success) / 0.1)' : 'rgb(var(--surface-base))',
+          border: `1px solid ${resolvedCount === totalIssues ? 'rgb(var(--success) / 0.2)' : 'rgb(var(--border-subtle))'}`,
+        }}
+      >
+        <div className="flex items-center gap-3">
+          {resolvedCount === totalIssues ? (
+            <CheckCircle2 className="w-5 h-5" style={{ color: 'rgb(var(--success))' }} />
+          ) : (
+            <AlertTriangle className="w-5 h-5" style={{ color: 'rgb(var(--warning))' }} />
+          )}
+          <div>
+            <p className="text-sm font-medium" style={{ color: 'rgb(var(--text-primary))' }}>
+              {resolvedCount === totalIssues ? 'All Issues Addressed' : `${totalIssues - resolvedCount} items need attention`}
+            </p>
+            <p className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+              {resolvedCount} of {totalIssues} resolved
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1">
+          {Array.from({ length: totalIssues }).map((_, i) => (
+            <div
+              key={i}
+              className="w-2 h-2 rounded-full"
+              style={{
+                background: i < resolvedCount ? 'rgb(var(--success))' : 'rgb(var(--border-default))',
+              }}
+            />
+          ))}
+        </div>
+      </div>
+
+      {qa.placeholders.length > 0 && (
+        <QACategory
+          title="Placeholders to Fill"
+          description="These require your input before the deliverables are complete"
+          items={qa.placeholders}
+          category="placeholders"
+          severity="high"
+          onResolve={onResolve}
+          onAccept={onAccept}
+          getResolution={getResolution}
+        />
+      )}
+
+      {qa.assumptions.length > 0 && (
+        <QACategory
+          title="AI Assumptions Made"
+          description="The AI made these educated guesses. Confirm or correct them."
+          items={qa.assumptions}
+          category="assumptions"
+          severity="medium"
+          onResolve={onResolve}
+          onAccept={onAccept}
+          getResolution={getResolution}
+        />
+      )}
+
+      {qa.claims_requiring_proof.length > 0 && (
+        <QACategory
+          title="Claims Needing Proof"
+          description="These statements should be backed by evidence or sources"
+          items={qa.claims_requiring_proof}
+          category="claims_requiring_proof"
+          severity="low"
+          onResolve={onResolve}
+          onAccept={onAccept}
+          getResolution={getResolution}
+        />
+      )}
+    </div>
+  );
+}
+
+interface QACategoryProps {
+  title: string;
+  description: string;
+  items: string[];
+  category: string;
+  severity: 'high' | 'medium' | 'low';
+  onResolve: (category: string, index: number, resolution: string) => void;
+  onAccept: (category: string, index: number) => void;
+  getResolution: (category: string, index: number) => QAResolution | undefined;
+}
+
+function QACategory({
+  title,
+  description,
+  items,
+  category,
+  severity,
+  onResolve,
+  onAccept,
+  getResolution,
+}: QACategoryProps) {
+  const severityConfig = {
+    high: { color: '--error', label: 'High Priority', icon: XCircle },
+    medium: { color: '--warning', label: 'Medium', icon: AlertTriangle },
+    low: { color: '--accent-primary', label: 'Low', icon: Info },
+  };
+
+  const config = severityConfig[severity];
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-2">
+        <config.icon className="w-4 h-4" style={{ color: `rgb(var(${config.color}))` }} />
+        <h4 className="text-sm font-semibold" style={{ color: 'rgb(var(--text-primary))' }}>
+          {title}
+        </h4>
+        <span
+          className="text-xs px-1.5 py-0.5 rounded"
+          style={{ background: `rgb(var(${config.color}) / 0.1)`, color: `rgb(var(${config.color}))` }}
+        >
+          {items.length}
+        </span>
+      </div>
+      <p className="text-xs mb-3" style={{ color: 'rgb(var(--text-muted))' }}>
+        {description}
+      </p>
+      <div className="space-y-2">
+        {items.map((item, index) => (
+          <QAItem
+            key={index}
+            item={item}
+            category={category}
+            index={index}
+            severity={severity}
+            resolution={getResolution(category, index)}
+            onResolve={onResolve}
+            onAccept={onAccept}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+interface QAItemProps {
+  item: string;
+  category: string;
+  index: number;
+  severity: 'high' | 'medium' | 'low';
+  resolution?: QAResolution;
+  onResolve: (category: string, index: number, resolution: string) => void;
+  onAccept: (category: string, index: number) => void;
+}
+
+function QAItem({
+  item,
+  category,
+  index,
+  severity,
+  resolution,
+  onResolve,
+  onAccept,
+}: QAItemProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState('');
+
+  const isResolved = resolution?.status === 'resolved' || resolution?.status === 'accepted';
+
+  const severityColors = {
+    high: '--error',
+    medium: '--warning',
+    low: '--accent-primary',
+  };
+
+  const handleSave = () => {
+    onResolve(category, index, editValue);
+    setIsEditing(false);
+    setEditValue('');
+  };
+
+  if (isResolved) {
+    return (
+      <div
+        className="p-3 rounded-xl flex items-start gap-3"
+        style={{
+          background: 'rgb(var(--success) / 0.05)',
+          border: '1px solid rgb(var(--success) / 0.15)',
+        }}
+      >
+        <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: 'rgb(var(--success))' }} />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm line-through" style={{ color: 'rgb(var(--text-muted))' }}>
+            {item}
+          </p>
+          {resolution?.resolution && (
+            <p className="text-sm mt-1" style={{ color: 'rgb(var(--success))' }}>
+              Resolved: {resolution.resolution}
+            </p>
+          )}
+          {resolution?.status === 'accepted' && (
+            <p className="text-xs mt-1" style={{ color: 'rgb(var(--text-muted))' }}>
+              Accepted as-is
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="p-3 rounded-xl"
+      style={{
+        background: `rgb(var(${severityColors[severity]}) / 0.05)`,
+        border: `1px solid rgb(var(${severityColors[severity]}) / 0.15)`,
+      }}
+    >
+      <div className="flex items-start gap-3">
+        <Circle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: `rgb(var(${severityColors[severity]}))` }} />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm" style={{ color: 'rgb(var(--text-primary))' }}>
+            {item}
+          </p>
+
+          {isEditing ? (
+            <div className="mt-3 space-y-2">
+              <input
+                type="text"
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                placeholder="Enter correction or additional info..."
+                className="input-field text-sm"
+                autoFocus
+              />
+              <div className="flex items-center gap-2">
+                <button onClick={handleSave} className="btn-primary text-xs py-1.5">
+                  <Check className="w-3 h-3" />
+                  Save
+                </button>
+                <button onClick={() => setIsEditing(false)} className="btn-ghost text-xs py-1.5">
+                  <X className="w-3 h-3" />
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 mt-2">
+              <button
+                onClick={() => setIsEditing(true)}
+                className="btn-ghost text-xs py-1"
+              >
+                <Edit3 className="w-3 h-3" />
+                Correct
+              </button>
+              <button
+                onClick={() => onAccept(category, index)}
+                className="btn-ghost text-xs py-1"
+              >
+                <Check className="w-3 h-3" />
+                Accept as-is
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface GapAnalysisProps {
+  wr1: WR1;
+  project: ProjectMetadata;
+  qaResolutions: Map<string, QAResolution>;
+}
+
+function GapAnalysis({ wr1, project, qaResolutions }: GapAnalysisProps) {
+  const gaps: Array<{ issue: string; recommendation: string; severity: 'high' | 'medium' | 'low' }> = [];
+
+  if (!wr1.parsed_intake.client_name) {
+    gaps.push({
+      issue: 'Missing client name',
+      recommendation: 'Add the client or business name in the Client & Speaker section',
+      severity: 'high',
+    });
+  }
+
+  if (!wr1.parsed_intake.target_audience) {
+    gaps.push({
+      issue: 'Target audience not defined',
+      recommendation: 'Specify who this webinar is for in the Target Audience section',
+      severity: 'high',
+    });
+  }
+
+  if (wr1.proof_points.length === 0) {
+    gaps.push({
+      issue: 'No proof points',
+      recommendation: 'Add testimonials, metrics, or case studies to build credibility',
+      severity: 'medium',
+    });
+  }
+
+  const unsourcedProof = wr1.proof_points.filter(p => !p.source).length;
+  if (unsourcedProof > 0) {
+    gaps.push({
+      issue: `${unsourcedProof} proof point${unsourcedProof > 1 ? 's' : ''} without sources`,
+      recommendation: 'Add source attribution to make claims verifiable',
+      severity: 'low',
+    });
+  }
+
+  if (wr1.main_themes.length < 3) {
+    gaps.push({
+      issue: 'Limited main themes',
+      recommendation: 'Consider expanding content depth for a richer webinar experience',
+      severity: 'low',
+    });
+  }
+
+  const unresolvedQA = (wr1.qa.assumptions.length + wr1.qa.placeholders.length + wr1.qa.claims_requiring_proof.length) -
+    Array.from(qaResolutions.values()).filter(r => r.status === 'resolved' || r.status === 'accepted').length;
+
+  if (unresolvedQA > 0) {
+    gaps.push({
+      issue: `${unresolvedQA} unresolved QA item${unresolvedQA > 1 ? 's' : ''}`,
+      recommendation: 'Review and address items in the Quality Assurance section',
+      severity: unresolvedQA > 3 ? 'high' : 'medium',
+    });
+  }
+
+  if (gaps.length === 0) {
+    return (
+      <div
+        className="rounded-2xl p-6 text-center"
+        style={{
+          background: 'rgb(var(--success) / 0.05)',
+          border: '1px solid rgb(var(--success) / 0.15)',
+        }}
+      >
+        <CheckCircle2 className="w-10 h-10 mx-auto mb-3" style={{ color: 'rgb(var(--success))' }} />
+        <h3 className="text-lg font-semibold mb-1" style={{ color: 'rgb(var(--text-primary))' }}>
+          Dossier Complete
+        </h3>
+        <p className="text-sm" style={{ color: 'rgb(var(--text-muted))' }}>
+          All required fields are filled and quality checks pass. Ready to generate deliverables.
+        </p>
+      </div>
+    );
+  }
+
+  const highCount = gaps.filter(g => g.severity === 'high').length;
+  const medCount = gaps.filter(g => g.severity === 'medium').length;
+
+  return (
+    <div
+      className="rounded-2xl overflow-hidden"
+      style={{
+        background: 'rgb(var(--surface-elevated))',
+        border: '1px solid rgb(var(--border-default))',
+      }}
+    >
+      <div className="p-4 flex items-center justify-between border-b" style={{ borderColor: 'rgb(var(--border-default))' }}>
+        <div className="flex items-center gap-3">
+          <div
+            className="p-2 rounded-lg"
+            style={{ background: 'rgb(var(--warning) / 0.1)' }}
+          >
+            <AlertTriangle className="w-4 h-4" style={{ color: 'rgb(var(--warning))' }} />
+          </div>
+          <div>
+            <h3 className="font-semibold" style={{ color: 'rgb(var(--text-primary))' }}>
+              Gap Analysis
+            </h3>
+            <p className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+              {highCount > 0 ? `${highCount} critical, ` : ''}{medCount} items to improve
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4 space-y-3">
+        {gaps.map((gap, index) => {
+          const severityColors = {
+            high: { bg: 'rgb(var(--error) / 0.1)', border: 'rgb(var(--error) / 0.2)', text: 'rgb(var(--error))' },
+            medium: { bg: 'rgb(var(--warning) / 0.1)', border: 'rgb(var(--warning) / 0.2)', text: 'rgb(var(--warning))' },
+            low: { bg: 'rgb(var(--accent-primary) / 0.1)', border: 'rgb(var(--accent-primary) / 0.2)', text: 'rgb(var(--accent-primary))' },
+          };
+          const colors = severityColors[gap.severity];
+
+          return (
+            <div
+              key={index}
+              className="p-3 rounded-xl"
+              style={{
+                background: colors.bg,
+                border: `1px solid ${colors.border}`,
+              }}
+            >
+              <p className="text-sm font-medium mb-1" style={{ color: 'rgb(var(--text-primary))' }}>
+                {gap.issue}
+              </p>
+              <p className="text-xs flex items-center gap-1" style={{ color: colors.text }}>
+                <Lightbulb className="w-3 h-3" />
+                {gap.recommendation}
+              </p>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -663,4 +1692,89 @@ function JsonViewer({ content }: { content: unknown }) {
       </div>
     </div>
   );
+}
+
+function calculateCompleteness(wr1: WR1 | undefined, qaResolutions: Map<string, QAResolution>): number {
+  if (!wr1) return 0;
+
+  let score = 0;
+  let total = 0;
+
+  const fields = [
+    { value: wr1.parsed_intake.client_name, weight: 15 },
+    { value: wr1.parsed_intake.company, weight: 10 },
+    { value: wr1.parsed_intake.webinar_title, weight: 10 },
+    { value: wr1.parsed_intake.target_audience, weight: 15 },
+    { value: wr1.parsed_intake.offer, weight: 10 },
+    { value: wr1.executive_summary?.overview, weight: 10 },
+    { value: wr1.main_themes.length > 0, weight: 10 },
+    { value: wr1.proof_points.length > 0, weight: 10 },
+  ];
+
+  fields.forEach(f => {
+    total += f.weight;
+    if (f.value) score += f.weight;
+  });
+
+  const qaTotal = wr1.qa.assumptions.length + wr1.qa.placeholders.length + wr1.qa.claims_requiring_proof.length;
+  const qaResolved = Array.from(qaResolutions.values()).filter(r => r.status === 'resolved' || r.status === 'accepted').length;
+
+  if (qaTotal > 0) {
+    total += 10;
+    score += (qaResolved / qaTotal) * 10;
+  }
+
+  return Math.round((score / total) * 100);
+}
+
+function getClientCompleteness(wr1: WR1): number {
+  let filled = 0;
+  if (wr1.parsed_intake.client_name) filled++;
+  if (wr1.parsed_intake.company) filled++;
+  if (wr1.parsed_intake.speaker_name) filled++;
+  if (wr1.parsed_intake.speaker_title) filled++;
+  return Math.round((filled / 4) * 100);
+}
+
+function getWebinarCompleteness(wr1: WR1): number {
+  let filled = 0;
+  if (wr1.parsed_intake.webinar_title) filled++;
+  if (wr1.parsed_intake.offer) filled++;
+  if (wr1.parsed_intake.tone) filled++;
+  if (wr1.parsed_intake.primary_cta_type) filled++;
+  return Math.round((filled / 4) * 100);
+}
+
+function getThemesCompleteness(wr1: WR1): number {
+  const hasThemes = wr1.main_themes.length >= 3;
+  const hasNotes = wr1.structured_notes.length > 0;
+  const hasInsights = wr1.speaker_insights.length > 0;
+
+  let score = 0;
+  if (hasThemes) score += 50;
+  else if (wr1.main_themes.length > 0) score += 25;
+  if (hasNotes) score += 25;
+  if (hasInsights) score += 25;
+
+  return Math.min(100, score);
+}
+
+function getProofCompleteness(wr1: WR1): number {
+  if (wr1.proof_points.length === 0) return 0;
+
+  const sourced = wr1.proof_points.filter(p => p.source).length;
+  const total = wr1.proof_points.length;
+
+  const hasTypes = new Set(wr1.proof_points.map(p => p.type)).size;
+  const typeBonus = hasTypes >= 2 ? 20 : 0;
+
+  return Math.min(100, Math.round((sourced / total) * 80) + typeBonus);
+}
+
+function getQACompleteness(wr1: WR1, qaResolutions: Map<string, QAResolution>): number {
+  const total = wr1.qa.assumptions.length + wr1.qa.placeholders.length + wr1.qa.claims_requiring_proof.length;
+  if (total === 0) return 100;
+
+  const resolved = Array.from(qaResolutions.values()).filter(r => r.status === 'resolved' || r.status === 'accepted').length;
+  return Math.round((resolved / total) * 100);
 }
