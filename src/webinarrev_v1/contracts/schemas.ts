@@ -54,7 +54,7 @@ export const WR1Schema = z.object({
     speaker_name: z.string().nullable(),
     speaker_title: z.string().nullable(),
   }).strict(),
-  executive_summary: ExecutiveSummarySchema.optional(),
+  executive_summary: ExecutiveSummarySchema,
   edited_fields: z.array(z.string()).optional(),
   cleaned_transcript: z.string(),
   structured_notes: z.array(z.string()),
