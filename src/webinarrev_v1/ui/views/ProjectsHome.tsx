@@ -192,8 +192,7 @@ function ProjectCard({ project, onClick, onDelete }: ProjectCardProps) {
     onDelete();
   };
 
-  const clientName = project.settings?.client_name;
-  const ctaMode = project.settings?.cta_mode;
+  const clientName = project.settings?.client_name || project.settings?.company_name;
   const duration = project.settings?.webinar_length_minutes;
 
   return (
@@ -247,12 +246,6 @@ function ProjectCard({ project, onClick, onDelete }: ProjectCardProps) {
           <Clock className="w-3 h-3" />
           {formatRelativeTime(project.updated_at)}
         </span>
-        {ctaMode && (
-          <span className="flex items-center gap-1">
-            <Target className="w-3 h-3" />
-            {ctaMode}
-          </span>
-        )}
         {duration && (
           <span>{duration}min</span>
         )}
