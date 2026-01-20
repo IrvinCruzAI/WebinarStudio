@@ -6,7 +6,11 @@
 
 ## Overview
 
-WebinarRev V1 transforms the webinar generation system from a 5-deliverable asset generator into a framework-first construction system powered by the 21-block Vernon Framework.
+WebinarRev V1 transforms the webinar generation system from a 5-deliverable asset generator into a framework-first construction system powered by a 21-block webinar framework structure.
+
+## Framework Labeling Notice
+
+**IMPORTANT:** The current 21-block structure (B01-B21) is labeled "Default 7-7-7 v0.1" and represents a provisional framework structure. This is NOT Vernon's finalized Triple Seven framework. The structure is locked for V1 but content/naming may be updated in future versions once Vernon's official framework documentation is integrated. Do not represent this as Vernon's official methodology to clients.
 
 ## Non-Negotiables
 

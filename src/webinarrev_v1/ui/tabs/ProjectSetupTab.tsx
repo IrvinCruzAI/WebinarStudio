@@ -19,7 +19,10 @@ import {
   Sparkles,
   Copy,
   Check,
+  Thermometer,
+  Zap,
 } from 'lucide-react';
+import type { CTA, AudienceTemperature } from '../../contracts';
 import type { ProjectMetadata, DeliverableId, WR1 } from '../../contracts';
 import { readTranscript, writeTranscript } from '../../store/storageService';
 import { formatDateTime } from '../utils/formatters';
@@ -46,6 +49,7 @@ interface ProjectSetupTabProps {
   isPipelineRunning: boolean;
   onRunPipeline: () => void;
   onUpdateProject?: (updates: Partial<ProjectMetadata['settings']>) => Promise<void>;
+  onSettingsChange?: (updates: Partial<ProjectMetadata['settings']>) => void;
 }
 
 export function ProjectSetupTab({
@@ -54,6 +58,7 @@ export function ProjectSetupTab({
   isPipelineRunning,
   onRunPipeline,
   onUpdateProject,
+  onSettingsChange,
 }: ProjectSetupTabProps) {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(['profile', 'config', 'sources'])
@@ -66,10 +71,46 @@ export function ProjectSetupTab({
   const [editedNotes, setEditedNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [activeTranscript, setActiveTranscript] = useState<'build' | 'intake' | 'notes'>('build');
+  const [isEditingConfig, setIsEditingConfig] = useState(false);
+  const [editedCtaMode, setEditedCtaMode] = useState<CTA>(project.settings.cta_mode);
+  const [editedAudienceTemp, setEditedAudienceTemp] = useState<AudienceTemperature>(project.settings.audience_temperature);
+  const [editedDuration, setEditedDuration] = useState(project.settings.webinar_length_minutes);
+  const [configChanged, setConfigChanged] = useState(false);
 
   useEffect(() => {
     loadTranscripts();
   }, [project.project_id]);
+
+  useEffect(() => {
+    setEditedCtaMode(project.settings.cta_mode);
+    setEditedAudienceTemp(project.settings.audience_temperature);
+    setEditedDuration(project.settings.webinar_length_minutes);
+    setConfigChanged(false);
+    setIsEditingConfig(false);
+  }, [project.project_id, project.settings]);
+
+  const handleSaveConfig = () => {
+    if (onSettingsChange) {
+      onSettingsChange({
+        cta_mode: editedCtaMode,
+        audience_temperature: editedAudienceTemp,
+        webinar_length_minutes: editedDuration,
+      });
+    }
+    setIsEditingConfig(false);
+    setConfigChanged(
+      editedCtaMode !== project.settings.cta_mode ||
+      editedAudienceTemp !== project.settings.audience_temperature ||
+      editedDuration !== project.settings.webinar_length_minutes
+    );
+  };
+
+  const handleCancelConfigEdit = () => {
+    setEditedCtaMode(project.settings.cta_mode);
+    setEditedAudienceTemp(project.settings.audience_temperature);
+    setEditedDuration(project.settings.webinar_length_minutes);
+    setIsEditingConfig(false);
+  };
 
   const loadTranscripts = async () => {
     setIsLoadingTranscripts(true);
@@ -207,25 +248,152 @@ export function ProjectSetupTab({
           expanded={expandedSections.has('config')}
           onToggle={() => toggleSection('config')}
         >
-          <div className="grid grid-cols-3 gap-4">
-            <ConfigField
-              label="CTA Mode"
-              value={project.settings.cta_mode}
-              icon={Target}
-            />
-            <ConfigField
-              label="Audience Temperature"
-              value={formatAudienceTemp(project.settings.audience_temperature)}
-            />
-            <ConfigField
-              label="Duration"
-              value={`${project.settings.webinar_length_minutes} minutes`}
-              icon={Clock}
-            />
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+              {isEditingConfig ? 'Edit webinar settings' : 'Click Edit to modify settings'}
+            </span>
+            <div className="flex items-center gap-2">
+              {isEditingConfig ? (
+                <>
+                  <button onClick={handleCancelConfigEdit} className="btn-ghost text-xs">
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    Cancel
+                  </button>
+                  <button onClick={handleSaveConfig} className="btn-primary text-xs">
+                    <Save className="w-3.5 h-3.5" />
+                    Save
+                  </button>
+                </>
+              ) : (
+                <button onClick={() => setIsEditingConfig(true)} className="btn-ghost text-xs">
+                  <Edit3 className="w-3.5 h-3.5" />
+                  Edit
+                </button>
+              )}
+            </div>
           </div>
-          <p className="text-xs mt-4" style={{ color: 'rgb(var(--text-muted))' }}>
-            Configuration is set during project creation
-          </p>
+
+          {configChanged && !isEditingConfig && (
+            <div
+              className="p-3 rounded-xl flex items-center justify-between mb-4"
+              style={{
+                background: 'rgb(var(--warning) / 0.1)',
+                border: '1px solid rgb(var(--warning) / 0.2)',
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" style={{ color: 'rgb(var(--warning))' }} />
+                <span className="text-sm" style={{ color: 'rgb(var(--text-primary))' }}>
+                  Settings changed. Regenerate to apply new configuration.
+                </span>
+              </div>
+              <button onClick={onRunPipeline} disabled={isPipelineRunning} className="btn-primary text-xs">
+                <RefreshCw className="w-3.5 h-3.5" />
+                Regenerate
+              </button>
+            </div>
+          )}
+
+          {isEditingConfig ? (
+            <div className="grid grid-cols-3 gap-4">
+              <div
+                className="p-3 rounded-xl"
+                style={{
+                  background: 'rgb(var(--surface-base))',
+                  border: '1px solid rgb(var(--accent-primary) / 0.3)',
+                }}
+              >
+                <label className="text-xs font-medium uppercase tracking-wide flex items-center gap-1.5 mb-2" style={{ color: 'rgb(var(--text-muted))' }}>
+                  <Target className="w-3 h-3" />
+                  CTA Mode
+                </label>
+                <select
+                  value={editedCtaMode}
+                  onChange={(e) => setEditedCtaMode(e.target.value as CTA)}
+                  className="w-full px-2 py-1.5 text-sm rounded-lg"
+                  style={{
+                    background: 'rgb(var(--surface-elevated))',
+                    border: '1px solid rgb(var(--border-default))',
+                    color: 'rgb(var(--text-primary))',
+                  }}
+                >
+                  <option value="book_call">Book a Call</option>
+                  <option value="buy_now">Buy Now</option>
+                  <option value="hybrid">Hybrid</option>
+                </select>
+              </div>
+              <div
+                className="p-3 rounded-xl"
+                style={{
+                  background: 'rgb(var(--surface-base))',
+                  border: '1px solid rgb(var(--accent-primary) / 0.3)',
+                }}
+              >
+                <label className="text-xs font-medium uppercase tracking-wide flex items-center gap-1.5 mb-2" style={{ color: 'rgb(var(--text-muted))' }}>
+                  <Thermometer className="w-3 h-3" />
+                  Audience Temperature
+                </label>
+                <select
+                  value={editedAudienceTemp}
+                  onChange={(e) => setEditedAudienceTemp(e.target.value as AudienceTemperature)}
+                  className="w-full px-2 py-1.5 text-sm rounded-lg"
+                  style={{
+                    background: 'rgb(var(--surface-elevated))',
+                    border: '1px solid rgb(var(--border-default))',
+                    color: 'rgb(var(--text-primary))',
+                  }}
+                >
+                  <option value="cold">Cold</option>
+                  <option value="warm">Warm</option>
+                  <option value="hot">Hot</option>
+                </select>
+              </div>
+              <div
+                className="p-3 rounded-xl"
+                style={{
+                  background: 'rgb(var(--surface-base))',
+                  border: '1px solid rgb(var(--accent-primary) / 0.3)',
+                }}
+              >
+                <label className="text-xs font-medium uppercase tracking-wide flex items-center gap-1.5 mb-2" style={{ color: 'rgb(var(--text-muted))' }}>
+                  <Clock className="w-3 h-3" />
+                  Duration (minutes)
+                </label>
+                <input
+                  type="number"
+                  value={editedDuration}
+                  onChange={(e) => setEditedDuration(Math.max(15, Math.min(180, parseInt(e.target.value) || 60)))}
+                  min={15}
+                  max={180}
+                  step={5}
+                  className="w-full px-2 py-1.5 text-sm rounded-lg"
+                  style={{
+                    background: 'rgb(var(--surface-elevated))',
+                    border: '1px solid rgb(var(--border-default))',
+                    color: 'rgb(var(--text-primary))',
+                  }}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-4">
+              <ConfigField
+                label="CTA Mode"
+                value={formatCtaMode(project.settings.cta_mode)}
+                icon={Target}
+              />
+              <ConfigField
+                label="Audience Temperature"
+                value={formatAudienceTemp(project.settings.audience_temperature)}
+                icon={Thermometer}
+              />
+              <ConfigField
+                label="Duration"
+                value={`${project.settings.webinar_length_minutes} minutes`}
+                icon={Clock}
+              />
+            </div>
+          )}
         </SetupSection>
 
         <SetupSection
@@ -366,7 +534,7 @@ function ConfigField({
 }: {
   label: string;
   value: string;
-  icon?: typeof Target;
+  icon?: React.ComponentType<{ className?: string }>;
 }) {
   return (
     <div
@@ -608,6 +776,15 @@ function formatAudienceTemp(temp: string): string {
     case 'warm': return 'Warm';
     case 'hot': return 'Hot';
     default: return temp;
+  }
+}
+
+function formatCtaMode(mode: string): string {
+  switch (mode) {
+    case 'book_call': return 'Book a Call';
+    case 'buy_now': return 'Buy Now';
+    case 'hybrid': return 'Hybrid';
+    default: return mode;
   }
 }
 

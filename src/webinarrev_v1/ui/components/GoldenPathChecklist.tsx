@@ -73,7 +73,7 @@ export default function GoldenPathChecklist({
           <div>
             <p className="text-sm font-medium text-green-300">All Checks Passed!</p>
             <p className="text-xs text-green-400/70 mt-1">
-              System meets all Vernon-ready criteria. Ready for production deployment.
+              System meets all framework-ready criteria. Ready for client export.
             </p>
           </div>
         </div>

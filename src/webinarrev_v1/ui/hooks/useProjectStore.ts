@@ -12,7 +12,9 @@ import {
   updateProjectStatus,
   updateDeliverablePointer,
   deleteProject,
+  updateProjectSettings,
 } from '../../store/metadataModel';
+import type { CTA, AudienceTemperature } from '../../contracts';
 import {
   readArtifact,
   atomicArtifactWrite,
@@ -520,6 +522,21 @@ export function useProjectStore() {
     await loadProjects();
   }, [state.selectedProjectId, loadProjects]);
 
+  const updateSettings = useCallback((updates: Partial<{
+    cta_mode: CTA;
+    audience_temperature: AudienceTemperature;
+    webinar_length_minutes: number;
+    client_name?: string;
+    speaker_name?: string;
+    company_name?: string;
+    contact_email?: string;
+  }>) => {
+    if (!state.selectedProjectId) return;
+
+    updateProjectSettings(state.selectedProjectId, updates);
+    loadProjects();
+  }, [state.selectedProjectId, loadProjects]);
+
   useEffect(() => {
     loadProjects();
   }, [loadProjects]);
@@ -544,5 +561,6 @@ export function useProjectStore() {
     removeProject,
     clearError,
     cancelPipeline,
+    updateSettings,
   };
 }

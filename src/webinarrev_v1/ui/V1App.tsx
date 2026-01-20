@@ -41,6 +41,7 @@ function V1AppContent() {
     removeProject,
     clearError,
     cancelPipeline,
+    updateSettings,
   } = useProjectStore();
 
   const handleCreateProject = async (formData: ProjectFormData) => {
@@ -171,6 +172,7 @@ function V1AppContent() {
               artifacts={artifacts}
               isPipelineRunning={isPipelineRunning}
               onRunPipeline={runPipeline}
+              onSettingsChange={updateSettings}
             />
           )}
         </div>

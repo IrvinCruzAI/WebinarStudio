@@ -114,3 +114,28 @@ export function deleteProject(projectId: string): void {
   const filtered = projects.filter(p => p.project_id !== projectId);
   saveMetadata(filtered);
 }
+
+export function updateProjectSettings(
+  projectId: string,
+  settingsUpdates: Partial<{
+    cta_mode: CTA;
+    audience_temperature: AudienceTemperature;
+    webinar_length_minutes: number;
+    client_name?: string;
+    speaker_name?: string;
+    company_name?: string;
+    contact_email?: string;
+  }>
+): void {
+  const project = getProject(projectId);
+  if (!project) {
+    throw new Error(`Project ${projectId} not found`);
+  }
+
+  updateProject(projectId, {
+    settings: {
+      ...project.settings,
+      ...settingsUpdates,
+    },
+  });
+}
