@@ -35,8 +35,8 @@ export const runOpenRouterStep = async (
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${apiKey}`,
-            'HTTP-Referer': 'webinarrev',
-            'X-Title': 'Webinar Rev',
+            'HTTP-Referer': 'webinarstudio',
+            'X-Title': 'WebinarStudio',
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({

@@ -1,5 +1,6 @@
 {
-  "name": "vite-react-typescript-starter",
+  "name": "webinar-studio",
+  "description": "Generate landing pages, email sequences, run-of-show documents, and checklists from your webinar content in minutes using AI",
   "private": true,
   "version": "0.0.0",
   "type": "module",

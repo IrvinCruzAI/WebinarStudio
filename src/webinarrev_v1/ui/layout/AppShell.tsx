@@ -1,6 +1,5 @@
 import { useState, type ReactNode } from 'react';
 import {
-  Layers,
   FolderOpen,
   Clock,
   Search,
@@ -11,6 +10,7 @@ import {
   Settings,
   Plus,
 } from 'lucide-react';
+import { WebcamLogo } from '../../../components/WebcamLogo';
 import { useTheme } from '../context/ThemeContext';
 import type { ProjectMetadata } from '../../contracts';
 
@@ -62,16 +62,13 @@ export function AppShell({
               background: 'linear-gradient(135deg, rgb(var(--accent-primary)), rgb(var(--accent-secondary)))',
             }}
           >
-            <Layers className="w-5 h-5 text-white" />
+            <WebcamLogo className="text-white" size={20} />
           </div>
           {!sidebarCollapsed && (
             <div className="flex-1 min-w-0">
-              <h1 className="font-semibold text-sm" style={{ color: 'rgb(var(--text-primary))' }}>
-                WebinarRev
+              <h1 className="font-semibold text-base" style={{ color: 'rgb(var(--text-primary))' }}>
+                WebinarStudio
               </h1>
-              <p className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
-                Studio
-              </p>
             </div>
           )}
           <button
