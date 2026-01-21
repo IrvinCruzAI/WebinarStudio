@@ -181,18 +181,18 @@ export function DurationTrustDashboard({
         border: `1px solid ${status.border}`,
       }}
     >
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full p-3 flex items-center justify-between text-left"
-      >
-        <div className="flex items-center gap-3">
+      <div className="w-full p-3 flex items-center justify-between">
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="flex items-center gap-3 flex-1 min-w-0 text-left"
+        >
           <div
             className="p-2 rounded-lg"
             style={{ background: status.color + '20' }}
           >
             <StatusIcon className="w-4 h-4" style={{ color: status.color }} />
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium" style={{ color: 'rgb(var(--text-primary))' }}>
                 {status.label}
@@ -217,32 +217,27 @@ export function DurationTrustDashboard({
               </span>
             </div>
           </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {analysis.wr2Status !== 'optimal' && onFitToDuration && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowPreview(true);
-              }}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-              style={{
-                background: 'rgb(var(--accent-primary))',
-                color: 'white',
-              }}
-            >
-              <Scale className="w-3 h-3" />
-              Fit to Duration
-            </button>
-          )}
           {isExpanded ? (
-            <ChevronUp className="w-4 h-4" style={{ color: 'rgb(var(--text-muted))' }} />
+            <ChevronUp className="w-4 h-4 flex-shrink-0" style={{ color: 'rgb(var(--text-muted))' }} />
           ) : (
-            <ChevronDown className="w-4 h-4" style={{ color: 'rgb(var(--text-muted))' }} />
+            <ChevronDown className="w-4 h-4 flex-shrink-0" style={{ color: 'rgb(var(--text-muted))' }} />
           )}
-        </div>
-      </button>
+        </button>
+
+        {analysis.wr2Status !== 'optimal' && onFitToDuration && (
+          <button
+            onClick={() => setShowPreview(true)}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ml-2 flex-shrink-0"
+            style={{
+              background: 'rgb(var(--accent-primary))',
+              color: 'white',
+            }}
+          >
+            <Scale className="w-3 h-3" />
+            Fit to Duration
+          </button>
+        )}
+      </div>
 
       {isExpanded && (
         <div

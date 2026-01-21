@@ -244,7 +244,7 @@ export function AppShell({
         >
           {sidebarCollapsed ? (
             <div className="flex flex-col items-center gap-2">
-              <button onClick={toggleTheme} className="btn-ghost p-2.5 rounded-xl">
+              <button key="theme-toggle-collapsed" onClick={toggleTheme} className="btn-ghost p-2.5 rounded-xl">
                 {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </button>
             </div>
