@@ -236,22 +236,29 @@ export function useProjectStore() {
     const artifact = state.artifacts.get(deliverableId);
     if (!artifact) return;
 
-    const content = artifact.content as Record<string, unknown>;
+    let content: Record<string, unknown>;
     const pathParts = field.split(/[.\[\]]/).filter(Boolean);
 
-    let target: Record<string, unknown> = content;
-    for (let i = 0; i < pathParts.length - 1; i++) {
-      const part = pathParts[i];
-      const nextTarget = target[part];
-      if (nextTarget && typeof nextTarget === 'object') {
-        target = nextTarget as Record<string, unknown>;
-      } else {
-        return;
+    // If no field path is provided, replace the entire content
+    if (pathParts.length === 0) {
+      content = value as Record<string, unknown>;
+    } else {
+      // Navigate the path and update the specific field
+      content = artifact.content as Record<string, unknown>;
+      let target: Record<string, unknown> = content;
+      for (let i = 0; i < pathParts.length - 1; i++) {
+        const part = pathParts[i];
+        const nextTarget = target[part];
+        if (nextTarget && typeof nextTarget === 'object') {
+          target = nextTarget as Record<string, unknown>;
+        } else {
+          return;
+        }
       }
-    }
 
-    const lastPart = pathParts[pathParts.length - 1];
-    target[lastPart] = value;
+      const lastPart = pathParts[pathParts.length - 1];
+      target[lastPart] = value;
+    }
 
     const project = getProject(state.selectedProjectId);
     if (!project) return;
