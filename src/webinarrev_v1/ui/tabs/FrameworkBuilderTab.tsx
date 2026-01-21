@@ -8,6 +8,8 @@ import {
   MessageSquare,
   Shield,
   RefreshCw,
+  LayoutGrid,
+  FileText as FileTextIcon,
 } from 'lucide-react';
 import type { ProjectMetadata, DeliverableId, WR2, WR2Block, BlockId, BlockPhase, WR6 } from '../../contracts';
 import { PHASE_MAPPING } from '../../contracts/enums';
@@ -15,6 +17,7 @@ import { BlockDetailSlideout } from '../components/BlockDetailSlideout';
 import { DurationTrustDashboard } from '../components/DurationTrustDashboard';
 import { checkRequiredSettings, type SettingsWarning } from '../../utils/settingsChecker';
 import { SettingsWarningModal } from '../modals/SettingsWarningModal';
+import { ScriptModeView } from '../components/ScriptModeView';
 
 interface FrameworkBuilderTabProps {
   project: ProjectMetadata;
@@ -46,6 +49,7 @@ export function FrameworkBuilderTab({
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [showSettingsWarning, setShowSettingsWarning] = useState(false);
   const [settingsWarnings, setSettingsWarnings] = useState<SettingsWarning[]>([]);
+  const [viewMode, setViewMode] = useState<'board' | 'script'>('board');
 
   const wr2Artifact = artifacts.get('WR2');
   const wr1Artifact = artifacts.get('WR1');
@@ -201,6 +205,30 @@ export function FrameworkBuilderTab({
               </p>
             </div>
             <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1 p-1 rounded-lg" style={{ background: 'rgb(var(--surface-base))' }}>
+                <button
+                  onClick={() => setViewMode('board')}
+                  className={`px-3 py-1.5 text-sm font-medium rounded transition-colors flex items-center gap-1.5 ${
+                    viewMode === 'board'
+                      ? 'bg-[rgb(var(--accent-primary))] text-white'
+                      : 'text-[rgb(var(--text-muted))] hover:text-[rgb(var(--text-primary))]'
+                  }`}
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                  Board
+                </button>
+                <button
+                  onClick={() => setViewMode('script')}
+                  className={`px-3 py-1.5 text-sm font-medium rounded transition-colors flex items-center gap-1.5 ${
+                    viewMode === 'script'
+                      ? 'bg-[rgb(var(--accent-primary))] text-white'
+                      : 'text-[rgb(var(--text-muted))] hover:text-[rgb(var(--text-primary))]'
+                  }`}
+                >
+                  <FileTextIcon className="w-4 h-4" />
+                  Script
+                </button>
+              </div>
               {onRegenerate && (
                 <div className="relative">
                   <button
@@ -247,26 +275,28 @@ export function FrameworkBuilderTab({
                   )}
                 </div>
               )}
-              <div className="relative">
-                <select
-                  value={jumpToBlock}
-                  onChange={(e) => handleJumpToBlock(e.target.value)}
-                  aria-label="Jump to block"
-                  className="input-field text-sm py-2 pr-8 appearance-none cursor-pointer"
-                  style={{ minWidth: '160px' }}
-                >
-                  <option value="">Jump to block...</option>
-                  {wr2.blocks.map((block) => (
-                    <option key={block.block_id} value={block.block_id}>
-                      {block.block_id} - {block.title.slice(0, 30)}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown
-                  className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
-                  style={{ color: 'rgb(var(--text-muted))' }}
-                />
-              </div>
+              {viewMode === 'board' && (
+                <div className="relative">
+                  <select
+                    value={jumpToBlock}
+                    onChange={(e) => handleJumpToBlock(e.target.value)}
+                    aria-label="Jump to block"
+                    className="input-field text-sm py-2 pr-8 appearance-none cursor-pointer"
+                    style={{ minWidth: '160px' }}
+                  >
+                    <option value="">Jump to block...</option>
+                    {wr2.blocks.map((block) => (
+                      <option key={block.block_id} value={block.block_id}>
+                        {block.block_id} - {block.title.slice(0, 30)}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
+                    style={{ color: 'rgb(var(--text-muted))' }}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
@@ -291,84 +321,99 @@ export function FrameworkBuilderTab({
             </div>
           )}
 
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4" style={{ color: 'rgb(var(--text-muted))' }} />
-              <span className="text-sm font-medium" style={{ color: 'rgb(var(--text-primary))' }}>
-                {totalDuration} min total
-              </span>
-            </div>
-            <div className="flex items-center gap-4 text-sm" style={{ color: 'rgb(var(--text-muted))' }}>
-              <span className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full" style={{ background: 'rgb(var(--success))' }} />
-                Beginning: {phaseStats.beginning}m
-              </span>
-              <span className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full" style={{ background: 'rgb(var(--accent-primary))' }} />
-                Middle: {phaseStats.middle}m
-              </span>
-              <span className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full" style={{ background: 'rgb(var(--warning))' }} />
-                End: {phaseStats.end}m
-              </span>
-            </div>
-            <div className="flex items-center gap-2 ml-auto">
-              <span className="text-xs px-2 py-1 rounded-full" style={{
-                background: 'rgb(var(--surface-base))',
-                color: 'rgb(var(--text-muted))'
-              }}>
-                {project.settings.cta_mode}
-              </span>
-              <span className="text-xs px-2 py-1 rounded-full" style={{
-                background: 'rgb(var(--surface-base))',
-                color: 'rgb(var(--text-muted))'
-              }}>
-                {project.settings.audience_temperature}
-              </span>
-            </div>
-          </div>
+          {viewMode === 'board' && (
+            <>
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4" style={{ color: 'rgb(var(--text-muted))' }} />
+                  <span className="text-sm font-medium" style={{ color: 'rgb(var(--text-primary))' }}>
+                    {totalDuration} min total
+                  </span>
+                </div>
+                <div className="flex items-center gap-4 text-sm" style={{ color: 'rgb(var(--text-muted))' }}>
+                  <span className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full" style={{ background: 'rgb(var(--success))' }} />
+                    Beginning: {phaseStats.beginning}m
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full" style={{ background: 'rgb(var(--accent-primary))' }} />
+                    Middle: {phaseStats.middle}m
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full" style={{ background: 'rgb(var(--warning))' }} />
+                    End: {phaseStats.end}m
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 ml-auto">
+                  <span className="text-xs px-2 py-1 rounded-full" style={{
+                    background: 'rgb(var(--surface-base))',
+                    color: 'rgb(var(--text-muted))'
+                  }}>
+                    {project.settings.cta_mode}
+                  </span>
+                  <span className="text-xs px-2 py-1 rounded-full" style={{
+                    background: 'rgb(var(--surface-base))',
+                    color: 'rgb(var(--text-muted))'
+                  }}>
+                    {project.settings.audience_temperature}
+                  </span>
+                </div>
+              </div>
 
-          <div className="mt-4">
-            <DurationTrustDashboard
-              targetDuration={project.settings.webinar_length_minutes}
-              wr2={wr2}
-              wr6={wr6}
-              onFitToDuration={handleFitToDuration}
-            />
-          </div>
+              <div className="mt-4">
+                <DurationTrustDashboard
+                  targetDuration={project.settings.webinar_length_minutes}
+                  wr2={wr2}
+                  wr6={wr6}
+                  onFitToDuration={handleFitToDuration}
+                />
+              </div>
+            </>
+          )}
         </div>
       </div>
 
-      <div className="p-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-3 gap-6">
-            <PhaseColumn
-              phase="beginning"
-              title="Beginning"
-              subtitle="Hook & Setup"
-              blocks={beginning}
-              onBlockClick={handleBlockClick}
-              color="success"
-            />
-            <PhaseColumn
-              phase="middle"
-              title="Middle"
-              subtitle="Content & Proof"
-              blocks={middle}
-              onBlockClick={handleBlockClick}
-              color="accent"
-            />
-            <PhaseColumn
-              phase="end"
-              title="End"
-              subtitle="Close & CTA"
-              blocks={end}
-              onBlockClick={handleBlockClick}
-              color="warning"
-            />
+      {viewMode === 'board' ? (
+        <div className="p-6">
+          <div className="max-w-6xl mx-auto">
+            <div className="grid grid-cols-3 gap-6">
+              <PhaseColumn
+                phase="beginning"
+                title="Beginning"
+                subtitle="Hook & Setup"
+                blocks={beginning}
+                onBlockClick={handleBlockClick}
+                color="success"
+              />
+              <PhaseColumn
+                phase="middle"
+                title="Middle"
+                subtitle="Content & Proof"
+                blocks={middle}
+                onBlockClick={handleBlockClick}
+                color="accent"
+              />
+              <PhaseColumn
+                phase="end"
+                title="End"
+                subtitle="Close & CTA"
+                blocks={end}
+                onBlockClick={handleBlockClick}
+                color="warning"
+              />
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <ScriptModeView
+          wr2={wr2}
+          wr6={wr6}
+          project={project}
+          onBlockEdit={handleBlockClick}
+          onNavigateToTab={onNavigateToTab}
+          onRunPipeline={handleRunPipeline}
+        />
+      )}
 
       {selectedBlockIndex !== null && wr2.blocks[selectedBlockIndex] && (
         <BlockDetailSlideout
