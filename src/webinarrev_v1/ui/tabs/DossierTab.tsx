@@ -161,7 +161,7 @@ export function DossierTab({
 
   const handleNavigateToProofs = () => {
     if (onNavigateToTab) {
-      onNavigateToTab('assets');
+      onNavigateToTab('proofs');
     }
   };
 
