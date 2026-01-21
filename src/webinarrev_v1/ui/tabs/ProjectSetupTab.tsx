@@ -762,6 +762,14 @@ export function ProjectSetupTab({
           />
         )}
       </div>
+
+      <SettingsWarningModal
+        isOpen={showSettingsWarning}
+        warnings={settingsWarnings}
+        onClose={() => setShowSettingsWarning(false)}
+        onGenerateAnyway={handleGenerateAnyway}
+        onConfigureSettings={handleConfigureSettings}
+      />
     </div>
   );
 }
@@ -1268,13 +1276,6 @@ function ProcessedTranscriptSection({
           </p>
         </div>
       )}
-      <SettingsWarningModal
-        isOpen={showSettingsWarning}
-        warnings={settingsWarnings}
-        onClose={() => setShowSettingsWarning(false)}
-        onGenerateAnyway={handleGenerateAnyway}
-        onConfigureSettings={handleConfigureSettings}
-      />
     </div>
   );
 }
