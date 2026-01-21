@@ -14,8 +14,6 @@ import {
 import type { ProjectMetadata, DeliverableId, WR2, WR2Block, BlockId, BlockPhase, WR6 } from '../../contracts';
 import { PHASE_MAPPING } from '../../contracts/enums';
 import { BlockDetailSlideout } from '../components/BlockDetailSlideout';
-import { DurationTrustDashboard } from '../components/DurationTrustDashboard';
-import { AttentionSummary } from '../components/AttentionSummary';
 import { checkRequiredSettings, type SettingsWarning } from '../../utils/settingsChecker';
 import { SettingsWarningModal } from '../modals/SettingsWarningModal';
 import { ScriptModeView } from '../components/ScriptModeView';
@@ -61,12 +59,6 @@ export function FrameworkBuilderTab({
 
   const isStale = wr1Artifact && wr2Artifact &&
     (wr1Artifact.edited_at || wr1Artifact.generated_at) > wr2Artifact.generated_at;
-
-  const handleFitToDuration = async (adjustedBlocks: WR2Block[]) => {
-    if (!wr2) return;
-    const newWr2: WR2 = { ...wr2, blocks: adjustedBlocks };
-    await onEditDeliverable('WR2', '', newWr2);
-  };
 
   const { beginning, middle, end, totalDuration, phaseStats } = useMemo(() => {
     if (!wr2?.blocks) {
@@ -378,15 +370,6 @@ export function FrameworkBuilderTab({
                     </span>
                   </div>
                 </div>
-
-                <AttentionSummary wr2={wr2} onBlockClick={handleBlockClick} />
-
-                <DurationTrustDashboard
-                  targetDuration={project.settings.webinar_length_minutes}
-                  wr2={wr2}
-                  wr6={wr6}
-                  onFitToDuration={handleFitToDuration}
-                />
               </div>
             </>
           )}
