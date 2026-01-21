@@ -23,7 +23,6 @@ import {
   Info,
   Quote,
   HelpCircle,
-  ArrowRight,
 } from 'lucide-react';
 import type { ProjectMetadata, DeliverableId, WR1 } from '../../contracts';
 import { EditableField, EditableTextArea } from '../components/EditableField';
@@ -142,26 +141,6 @@ export function DossierTab({
     setShowSettingsWarning(false);
     if (onNavigateToTab) {
       onNavigateToTab('project-setup');
-    }
-  };
-
-  const handleProofSourceUpdate = useCallback(async (index: number, source: string) => {
-    if (!wr1) return;
-
-    const updatedProofPoints = [...wr1.proof_points];
-    updatedProofPoints[index] = { ...updatedProofPoints[index], source };
-
-    const updatedContent = {
-      ...wr1,
-      proof_points: updatedProofPoints,
-    };
-
-    await onEditDeliverable('WR1', '', updatedContent);
-  }, [wr1, onEditDeliverable]);
-
-  const handleNavigateToProofs = () => {
-    if (onNavigateToTab) {
-      onNavigateToTab('proofs');
     }
   };
 
@@ -447,11 +426,7 @@ export function DossierTab({
               completeness={getProofCompleteness(wr1)}
               highlight="proof"
             >
-              <ProofVaultSection
-                proofPoints={wr1.proof_points}
-                onUpdateSource={handleProofSourceUpdate}
-                onNavigateToProofs={handleNavigateToProofs}
-              />
+              <ProofVaultSection proofPoints={wr1.proof_points} />
             </DossierSection>
 
             <DossierSection
@@ -1068,11 +1043,9 @@ function ArrayDisplay({ label, items, highlight }: { label: string; items: strin
 
 interface ProofVaultSectionProps {
   proofPoints: Array<{ type: string; content: string; source: string | null }>;
-  onUpdateSource: (index: number, source: string) => void;
-  onNavigateToProofs?: () => void;
 }
 
-function ProofVaultSection({ proofPoints, onUpdateSource, onNavigateToProofs }: ProofVaultSectionProps) {
+function ProofVaultSection({ proofPoints }: ProofVaultSectionProps) {
   if (!proofPoints || proofPoints.length === 0) {
     return (
       <div className="text-center py-8">
@@ -1097,35 +1070,7 @@ function ProofVaultSection({ proofPoints, onUpdateSource, onNavigateToProofs }: 
 
   return (
     <div className="space-y-4">
-      {onNavigateToProofs && (
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex-1">
-            {needsSource > 0 && (
-              <div
-                className="p-3 rounded-xl flex items-center gap-3"
-                style={{
-                  background: 'rgb(var(--warning) / 0.1)',
-                  border: '1px solid rgb(var(--warning) / 0.2)',
-                }}
-              >
-                <AlertTriangle className="w-4 h-4" style={{ color: 'rgb(var(--warning))' }} />
-                <span className="text-sm" style={{ color: 'rgb(var(--text-secondary))' }}>
-                  {needsSource} proof point{needsSource > 1 ? 's' : ''} need source attribution
-                </span>
-              </div>
-            )}
-          </div>
-          <button
-            onClick={onNavigateToProofs}
-            className="btn-ghost text-sm ml-4 flex-shrink-0"
-          >
-            Manage Proof Vault
-            <ArrowRight className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-
-      {!onNavigateToProofs && needsSource > 0 && (
+      {needsSource > 0 && (
         <div
           className="p-3 rounded-xl flex items-center gap-3"
           style={{
@@ -1164,23 +1109,14 @@ function ProofVaultSection({ proofPoints, onUpdateSource, onNavigateToProofs }: 
 
       <div className="space-y-3">
         {proofPoints.map((proof, index) => (
-          <ProofPointCard key={index} proof={proof} index={index} onUpdateSource={onUpdateSource} />
+          <ProofPointCard key={index} proof={proof} />
         ))}
       </div>
     </div>
   );
 }
 
-interface ProofPointCardProps {
-  proof: { type: string; content: string; source: string | null };
-  index: number;
-  onUpdateSource: (index: number, source: string) => void;
-}
-
-function ProofPointCard({ proof, index, onUpdateSource }: ProofPointCardProps) {
-  const [isEditingSource, setIsEditingSource] = useState(false);
-  const [sourceValue, setSourceValue] = useState(proof.source || '');
-
+function ProofPointCard({ proof }: { proof: { type: string; content: string; source: string | null } }) {
   const typeConfig: Record<string, { bg: string; text: string; icon: typeof Quote }> = {
     testimonial: { bg: 'rgb(var(--success) / 0.1)', text: 'rgb(var(--success))', icon: Quote },
     metric: { bg: 'rgb(var(--accent-primary) / 0.1)', text: 'rgb(var(--accent-primary))', icon: Target },
@@ -1188,16 +1124,6 @@ function ProofPointCard({ proof, index, onUpdateSource }: ProofPointCardProps) {
   };
 
   const config = typeConfig[proof.type] || typeConfig.testimonial;
-
-  const handleSaveSource = () => {
-    onUpdateSource(index, sourceValue);
-    setIsEditingSource(false);
-  };
-
-  const handleCancelEdit = () => {
-    setSourceValue(proof.source || '');
-    setIsEditingSource(false);
-  };
 
   return (
     <div
@@ -1234,48 +1160,11 @@ function ProofPointCard({ proof, index, onUpdateSource }: ProofPointCardProps) {
           <p className="text-sm" style={{ color: 'rgb(var(--text-primary))' }}>
             {proof.content}
           </p>
-
-          {isEditingSource ? (
-            <div className="mt-3 space-y-2">
-              <input
-                type="text"
-                value={sourceValue}
-                onChange={(e) => setSourceValue(e.target.value)}
-                placeholder="Enter source (URL, citation, or reference)"
-                className="input-field text-sm w-full"
-                autoFocus
-              />
-              <div className="flex items-center gap-2">
-                <button onClick={handleSaveSource} className="btn-primary text-xs py-1.5">
-                  <Check className="w-3 h-3" />
-                  Save
-                </button>
-                <button onClick={handleCancelEdit} className="btn-ghost text-xs py-1.5">
-                  <X className="w-3 h-3" />
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="mt-2 flex items-center justify-between">
-              {proof.source ? (
-                <p className="text-xs flex items-center gap-1" style={{ color: 'rgb(var(--text-muted))' }}>
-                  <CheckCircle2 className="w-3 h-3" style={{ color: 'rgb(var(--success))' }} />
-                  Source: {proof.source}
-                </p>
-              ) : (
-                <p className="text-xs italic" style={{ color: 'rgb(var(--text-muted))' }}>
-                  No source added
-                </p>
-              )}
-              <button
-                onClick={() => setIsEditingSource(true)}
-                className="btn-ghost text-xs py-1"
-              >
-                <Edit3 className="w-3 h-3" />
-                Edit Source
-              </button>
-            </div>
+          {proof.source && (
+            <p className="text-xs mt-2 flex items-center gap-1" style={{ color: 'rgb(var(--text-muted))' }}>
+              <CheckCircle2 className="w-3 h-3" style={{ color: 'rgb(var(--success))' }} />
+              Source: {proof.source}
+            </p>
           )}
         </div>
       </div>

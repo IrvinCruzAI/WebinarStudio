@@ -194,25 +194,6 @@ export default function ProjectDetail({
     await onEditDeliverable('WR3', `proof_blocks[${index}].source`, source);
   }
 
-  async function handleUpdateProofPoint(index: number, proof: { type: string; content: string; source: string | null }) {
-    if (!wr1) return;
-    const updatedProofPoints = [...wr1.proof_points];
-    updatedProofPoints[index] = proof;
-    await onEditDeliverable('WR1', '', { ...wr1, proof_points: updatedProofPoints });
-  }
-
-  async function handleAddProofPoint(proof: { type: string; content: string; source: string | null }) {
-    if (!wr1) return;
-    const updatedProofPoints = [...wr1.proof_points, proof];
-    await onEditDeliverable('WR1', '', { ...wr1, proof_points: updatedProofPoints });
-  }
-
-  async function handleDeleteProofPoint(index: number) {
-    if (!wr1) return;
-    const updatedProofPoints = wr1.proof_points.filter((_, i) => i !== index);
-    await onEditDeliverable('WR1', '', { ...wr1, proof_points: updatedProofPoints });
-  }
-
   async function handleRevalidate(deliverableId: DeliverableId) {
     const result = await onRevalidateDeliverable(deliverableId);
     setValidationResults((prev) => new Map(prev).set(deliverableId, result));
@@ -396,9 +377,6 @@ export default function ProjectDetail({
             wr3Data={wr3 ?? null}
             onUpdateProofSource={handleUpdateProofSource}
             onUpdateLandingProofSource={handleUpdateLandingProofSource}
-            onUpdateProofPoint={handleUpdateProofPoint}
-            onAddProofPoint={handleAddProofPoint}
-            onDeleteProofPoint={handleDeleteProofPoint}
           />
         )}
 
