@@ -5,6 +5,8 @@ import {
   WR3,
 } from '../contracts';
 
+const IS_DEV = import.meta.env.MODE === 'development';
+
 const CRITICAL_PLACEHOLDERS = [
   'link_placeholder',
 ];
@@ -21,6 +23,45 @@ const PLACEHOLDER_PATTERNS = [
   /XXX/g,
   /FIXME/gi,
 ];
+
+function isValidArtifactId(artifactId: string): boolean {
+  if (!artifactId || typeof artifactId !== 'string') {
+    return false;
+  }
+
+  if (artifactId.includes('undefined') || artifactId.includes('null')) {
+    if (IS_DEV) {
+      console.warn('[placeholderScanner] Invalid artifact_id contains "undefined" or "null":', artifactId);
+    }
+    return false;
+  }
+
+  const parts = artifactId.split(':');
+  if (parts.length !== 4) {
+    if (IS_DEV) {
+      console.warn('[placeholderScanner] Invalid artifact_id format (expected 4 parts):', artifactId);
+    }
+    return false;
+  }
+
+  const [projectId, runId, deliverableId, version] = parts;
+  if (!projectId || !runId || !deliverableId || !version) {
+    if (IS_DEV) {
+      console.warn('[placeholderScanner] Invalid artifact_id has empty parts:', artifactId);
+    }
+    return false;
+  }
+
+  const validDeliverablePattern = /^WR[1-9]$|^PREFLIGHT$/;
+  if (!validDeliverablePattern.test(deliverableId)) {
+    if (IS_DEV) {
+      console.warn('[placeholderScanner] Invalid deliverable_id in artifact_id:', deliverableId, 'from', artifactId);
+    }
+    return false;
+  }
+
+  return true;
+}
 
 const WR6_NON_CRITICAL_FIELDS = new Set([
   'coach_cue',
@@ -103,9 +144,18 @@ export function scanPlaceholders(
   artifacts: Map<DeliverableId, { content: unknown; artifact_id: string }>
 ): PlaceholderScanResult {
   const locations: PlaceholderLocation[] = [];
+  let malformedCount = 0;
 
   for (const [deliverableId, artifact] of artifacts) {
     if (deliverableId === 'PREFLIGHT' || deliverableId === 'WR9') {
+      continue;
+    }
+
+    if (!isValidArtifactId(artifact.artifact_id)) {
+      malformedCount++;
+      if (IS_DEV) {
+        console.warn('[placeholderScanner] Skipping malformed artifact:', { deliverableId, artifact_id: artifact.artifact_id });
+      }
       continue;
     }
 
@@ -114,6 +164,10 @@ export function scanPlaceholders(
     if (deliverableId === 'WR3') {
       scanWR3Proof(artifact.content as WR3, artifact.artifact_id, locations);
     }
+  }
+
+  if (IS_DEV && malformedCount > 0) {
+    console.warn(`[placeholderScanner] Filtered ${malformedCount} malformed artifact(s) from scan`);
   }
 
   const criticalCount = locations.filter(loc => loc.is_critical).length;
@@ -142,5 +196,76 @@ export async function scanPlaceholdersForProject(
     }
   }
 
-  return scanPlaceholders(artifacts);
+  const scanResult = scanPlaceholders(artifacts);
+
+  if (IS_DEV) {
+    assertValidPlaceholderScan(scanResult);
+  }
+
+  return scanResult;
+}
+
+export function assertValidPlaceholderScan(scanResult: PlaceholderScanResult): void {
+  if (!IS_DEV) {
+    return;
+  }
+
+  const issues: string[] = [];
+
+  for (const location of scanResult.locations) {
+    if (location.artifact_id.includes('undefined')) {
+      issues.push(`Location has "undefined" in artifact_id: ${location.artifact_id} at ${location.field_path}`);
+    }
+
+    if (location.artifact_id.includes('null')) {
+      issues.push(`Location has "null" in artifact_id: ${location.artifact_id} at ${location.field_path}`);
+    }
+
+    if (!isValidArtifactId(location.artifact_id)) {
+      issues.push(`Location has invalid artifact_id format: ${location.artifact_id}`);
+    }
+
+    if (location.field_path.includes('undefined')) {
+      issues.push(`Location has "undefined" in field_path: ${location.field_path} for ${location.artifact_id}`);
+    }
+
+    if (typeof location.is_critical !== 'boolean') {
+      issues.push(`Location has non-boolean is_critical: ${location.is_critical} for ${location.field_path}`);
+    }
+
+    const criticalInPath = location.field_path.toLowerCase().includes('link') ||
+                           location.placeholder_text.toLowerCase().includes('link');
+    const isCritical = location.is_critical;
+
+    if (criticalInPath && !isCritical) {
+      if (location.field_path.includes('cta_block') ||
+          location.placeholder_text.includes('link_placeholder')) {
+        issues.push(`Possible critical flag inconsistency: ${location.field_path} has link but is_critical=${isCritical}`);
+      }
+    }
+  }
+
+  if (scanResult.critical_count < 0) {
+    issues.push(`Invalid critical_count: ${scanResult.critical_count} (must be >= 0)`);
+  }
+
+  if (scanResult.total_count < scanResult.critical_count) {
+    issues.push(`Invalid counts: total_count (${scanResult.total_count}) < critical_count (${scanResult.critical_count})`);
+  }
+
+  if (scanResult.total_count !== scanResult.locations.length) {
+    issues.push(`Count mismatch: total_count=${scanResult.total_count} but locations.length=${scanResult.locations.length}`);
+  }
+
+  const actualCriticalCount = scanResult.locations.filter(loc => loc.is_critical).length;
+  if (actualCriticalCount !== scanResult.critical_count) {
+    issues.push(`Critical count mismatch: critical_count=${scanResult.critical_count} but actual=${actualCriticalCount}`);
+  }
+
+  if (issues.length > 0) {
+    console.error('[placeholderScanner] Runtime assertion failed!');
+    console.error('Issues found:', issues);
+    console.error('Scan result:', scanResult);
+    throw new Error(`placeholderScanner runtime assertion failed: ${issues.length} issue(s) detected. See console for details.`);
+  }
 }
