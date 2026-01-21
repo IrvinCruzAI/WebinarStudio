@@ -281,20 +281,17 @@ function ProjectCard({ project, onClick, onDelete }: ProjectCardProps) {
         </div>
       </div>
 
-      <div
-        className="mt-4 pt-4 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity"
-        style={{ borderTop: '1px solid rgb(var(--border-subtle))' }}
-      >
-        <span className="btn-ghost text-xs py-1.5 px-2.5">
-          Open
-        </span>
-        {project.status === 'exportable' && (
-          <span className="btn-ghost text-xs py-1.5 px-2.5">
+      {project.status === 'exportable' && (
+        <div
+          className="mt-4 pt-4 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity"
+          style={{ borderTop: '1px solid rgb(var(--border-subtle))' }}
+        >
+          <span className="btn-ghost text-xs py-1.5 px-2.5 flex items-center gap-1.5">
             <Download className="w-3 h-3" />
-            Export
+            Export Ready
           </span>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
