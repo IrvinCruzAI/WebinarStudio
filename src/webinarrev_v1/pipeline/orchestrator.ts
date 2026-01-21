@@ -5,6 +5,8 @@ import {
   RiskFlag,
   WR9,
   NormalizationLog,
+  ProjectMetadata,
+  QASummaryCounts,
 } from '../contracts';
 import { CancellableAIClient, createAIClient } from '../ai/client';
 import { AIQueue } from '../ai/queue';
@@ -16,6 +18,7 @@ import { computeReadinessScore } from './readinessScorer';
 import { atomicArtifactWrite } from '../store/storageService';
 import { readTranscript } from '../store/indexedDbWrapper';
 import { getProject, updateProjectStatus } from '../store/metadataModel';
+import { tagIssues, type RawIssue } from '../utils/qaSourceTagger';
 import {
   WR1Schema,
   WR2Schema,
@@ -153,7 +156,7 @@ export class PipelineOrchestrator {
         const batchStages = batches.get(batchNumber)!;
 
         if (batchStages.length === 1 && batchStages[0].id === 'WR9') {
-          await this.generateWR9(projectId, runId, dependencies, failedDeliverables);
+          await this.generateWR9(projectId, runId, dependencies, failedDeliverables, project.settings);
           continue;
         }
 
@@ -408,7 +411,8 @@ export class PipelineOrchestrator {
     projectId: string,
     runId: string,
     dependencies: Map<DeliverableId, unknown>,
-    failedDeliverables: Map<DeliverableId, string[]>
+    failedDeliverables: Map<DeliverableId, string[]>,
+    settings: ProjectMetadata['settings']
   ): Promise<void> {
     this.reportProgress({
       stage: 'Stage 6',
@@ -465,12 +469,57 @@ export class PipelineOrchestrator {
       missingContextCount,
     });
 
+    const rawIssues: RawIssue[] = [];
+
+    for (const [deliverableId, result] of validationResults) {
+      if (!result.ok) {
+        for (const error of result.errors) {
+          rawIssues.push({
+            type: 'validation',
+            severity: 'critical',
+            deliverableId: deliverableId as DeliverableId,
+            message: error,
+            fieldPath: undefined,
+          });
+        }
+      }
+    }
+
+    for (const location of placeholderScan.locations) {
+      const parts = location.artifact_id.split(':');
+      const deliverableId = parts[2] as DeliverableId;
+      rawIssues.push({
+        type: 'placeholder',
+        severity: location.is_critical ? 'critical' : 'warning',
+        deliverableId,
+        message: `Placeholder: ${location.placeholder_text}`,
+        fieldPath: location.field_path,
+      });
+    }
+
+    const taggingResult = tagIssues(rawIssues, settings);
+
+    const allTopFields = new Set<string>();
+    allTopFields.add(...taggingResult.summary.settings_required.top_fields);
+    allTopFields.add(...taggingResult.summary.input_missing.top_fields);
+    allTopFields.add(...taggingResult.summary.model_uncertain.top_fields);
+    const topFieldsArray = Array.from(allTopFields).slice(0, 5);
+
+    const qaSummaryCounts: QASummaryCounts = {
+      settings_required: taggingResult.summary.settings_required.count,
+      input_missing: taggingResult.summary.input_missing.count,
+      model_uncertain: taggingResult.summary.model_uncertain.count,
+      bugs_filtered: taggingResult.bugFilteredCount,
+      top_fields: topFieldsArray,
+    };
+
     const wr9: WR9 = {
       readiness_score: readinessResult.score,
       pass: readinessResult.pass,
       blocking_reasons: readinessResult.blockingReasons,
       validation_results: Object.fromEntries(validationResults),
       placeholder_scan: placeholderScan,
+      qa_summary_counts: qaSummaryCounts,
       recommended_next_actions: this.generateRecommendedActions(
         validationResults,
         placeholderScan,
@@ -657,7 +706,7 @@ export class PipelineOrchestrator {
         }
       }
 
-      await this.generateWR9(projectId, runId, dependencies, failedDeliverables);
+      await this.generateWR9(projectId, runId, dependencies, failedDeliverables, project.settings);
 
       const currentStatus = project.status;
       if (currentStatus === 'review' || currentStatus === 'ready' || currentStatus === 'failed') {

@@ -239,12 +239,23 @@ export const PlaceholderScanResultSchema = z.object({
 
 export type PlaceholderScanResult = z.infer<typeof PlaceholderScanResultSchema>;
 
+export const QASummaryCountsSchema = z.object({
+  settings_required: z.number().int().min(0),
+  input_missing: z.number().int().min(0),
+  model_uncertain: z.number().int().min(0),
+  bugs_filtered: z.number().int().min(0),
+  top_fields: z.array(z.string()).max(5),
+}).strict();
+
+export type QASummaryCounts = z.infer<typeof QASummaryCountsSchema>;
+
 export const WR9Schema = z.object({
   readiness_score: z.number().int().min(0).max(100),
   pass: z.boolean(),
   blocking_reasons: z.array(z.string()),
   validation_results: z.record(ValidationResultSchema),
   placeholder_scan: PlaceholderScanResultSchema,
+  qa_summary_counts: QASummaryCountsSchema,
   recommended_next_actions: z.array(z.string()),
 }).strict();
 
