@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ThemeProvider } from './context/ThemeContext';
+import { ToastProvider } from './context/ToastContext';
 import { AppShell } from './layout/AppShell';
 import { ProjectHeader } from './layout/ProjectHeader';
 import { ProjectsHome } from './views/ProjectsHome';
@@ -210,7 +211,9 @@ export default function V1App() {
   return (
     <ErrorBoundary>
       <ThemeProvider>
-        <V1AppContent />
+        <ToastProvider>
+          <V1AppContent />
+        </ToastProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );

@@ -20,6 +20,7 @@ interface ScriptBlockCardProps {
   onEdit: () => void;
   onNavigateToTab?: (tab: string) => void;
   searchQuery?: string;
+  isActive?: boolean;
 }
 
 export function ScriptBlockCard({
@@ -28,6 +29,7 @@ export function ScriptBlockCard({
   onEdit,
   onNavigateToTab,
   searchQuery,
+  isActive = false,
 }: ScriptBlockCardProps) {
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
 
@@ -84,10 +86,10 @@ export function ScriptBlockCard({
   return (
     <div
       id={`block-${block.block_id}`}
-      className="scroll-mt-24 rounded-xl overflow-hidden"
+      className={`scroll-mt-24 rounded-xl overflow-hidden transition-all ${isActive ? 'ring-2 ring-[rgb(var(--accent-primary))] shadow-lg' : ''}`}
       style={{
         background: 'rgb(var(--surface-elevated))',
-        border: '1px solid rgb(var(--border-default))',
+        border: isActive ? '2px solid rgb(var(--accent-primary))' : '1px solid rgb(var(--border-default))',
       }}
     >
       <div

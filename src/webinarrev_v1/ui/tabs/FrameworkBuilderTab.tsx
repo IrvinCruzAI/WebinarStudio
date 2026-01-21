@@ -15,9 +15,11 @@ import type { ProjectMetadata, DeliverableId, WR2, WR2Block, BlockId, BlockPhase
 import { PHASE_MAPPING } from '../../contracts/enums';
 import { BlockDetailSlideout } from '../components/BlockDetailSlideout';
 import { DurationTrustDashboard } from '../components/DurationTrustDashboard';
+import { AttentionSummary } from '../components/AttentionSummary';
 import { checkRequiredSettings, type SettingsWarning } from '../../utils/settingsChecker';
 import { SettingsWarningModal } from '../modals/SettingsWarningModal';
 import { ScriptModeView } from '../components/ScriptModeView';
+import { hasPlaceholders } from '../../utils/stageDirectionsFormatter';
 
 interface FrameworkBuilderTabProps {
   project: ProjectMetadata;
@@ -108,6 +110,22 @@ export function FrameworkBuilderTab({
   const handleSaveBlock = async (updatedBlock: WR2Block) => {
     if (selectedBlockIndex === null || !wr2) return;
     await onEditDeliverable('WR2', `blocks[${selectedBlockIndex}]`, updatedBlock);
+  };
+
+  const handleNavigateNext = () => {
+    if (selectedBlockIndex === null || !wr2) return;
+    const nextIndex = selectedBlockIndex + 1;
+    if (nextIndex < wr2.blocks.length) {
+      setSelectedBlockIndex(nextIndex);
+    }
+  };
+
+  const handleNavigatePrev = () => {
+    if (selectedBlockIndex === null) return;
+    const prevIndex = selectedBlockIndex - 1;
+    if (prevIndex >= 0) {
+      setSelectedBlockIndex(prevIndex);
+    }
   };
 
   const handleRegenerate = async (cascade: boolean) => {
@@ -323,44 +341,46 @@ export function FrameworkBuilderTab({
 
           {viewMode === 'board' && (
             <>
-              <div className="flex items-center gap-6">
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4" style={{ color: 'rgb(var(--text-muted))' }} />
-                  <span className="text-sm font-medium" style={{ color: 'rgb(var(--text-primary))' }}>
-                    {totalDuration} min total
-                  </span>
+              <div className="space-y-4">
+                <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4" style={{ color: 'rgb(var(--text-muted))' }} />
+                    <span className="text-sm font-medium" style={{ color: 'rgb(var(--text-primary))' }}>
+                      {totalDuration} min total
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-4 text-sm" style={{ color: 'rgb(var(--text-muted))' }}>
+                    <span className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full" style={{ background: 'rgb(var(--success))' }} />
+                      Beginning: {phaseStats.beginning}m
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full" style={{ background: 'rgb(var(--accent-primary))' }} />
+                      Middle: {phaseStats.middle}m
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full" style={{ background: 'rgb(var(--warning))' }} />
+                      End: {phaseStats.end}m
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 ml-auto">
+                    <span className="text-xs px-2 py-1 rounded-full" style={{
+                      background: 'rgb(var(--surface-base))',
+                      color: 'rgb(var(--text-muted))'
+                    }}>
+                      {project.settings.cta_mode}
+                    </span>
+                    <span className="text-xs px-2 py-1 rounded-full" style={{
+                      background: 'rgb(var(--surface-base))',
+                      color: 'rgb(var(--text-muted))'
+                    }}>
+                      {project.settings.audience_temperature}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-4 text-sm" style={{ color: 'rgb(var(--text-muted))' }}>
-                  <span className="flex items-center gap-1">
-                    <div className="w-2 h-2 rounded-full" style={{ background: 'rgb(var(--success))' }} />
-                    Beginning: {phaseStats.beginning}m
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <div className="w-2 h-2 rounded-full" style={{ background: 'rgb(var(--accent-primary))' }} />
-                    Middle: {phaseStats.middle}m
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <div className="w-2 h-2 rounded-full" style={{ background: 'rgb(var(--warning))' }} />
-                    End: {phaseStats.end}m
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 ml-auto">
-                  <span className="text-xs px-2 py-1 rounded-full" style={{
-                    background: 'rgb(var(--surface-base))',
-                    color: 'rgb(var(--text-muted))'
-                  }}>
-                    {project.settings.cta_mode}
-                  </span>
-                  <span className="text-xs px-2 py-1 rounded-full" style={{
-                    background: 'rgb(var(--surface-base))',
-                    color: 'rgb(var(--text-muted))'
-                  }}>
-                    {project.settings.audience_temperature}
-                  </span>
-                </div>
-              </div>
 
-              <div className="mt-4">
+                <AttentionSummary wr2={wr2} onBlockClick={handleBlockClick} />
+
                 <DurationTrustDashboard
                   targetDuration={project.settings.webinar_length_minutes}
                   wr2={wr2}
@@ -420,6 +440,10 @@ export function FrameworkBuilderTab({
           block={wr2.blocks[selectedBlockIndex]}
           onClose={() => setSelectedBlockIndex(null)}
           onSave={handleSaveBlock}
+          onNavigateNext={selectedBlockIndex < wr2.blocks.length - 1 ? handleNavigateNext : undefined}
+          onNavigatePrev={selectedBlockIndex > 0 ? handleNavigatePrev : undefined}
+          blockIndex={selectedBlockIndex}
+          totalBlocks={wr2.blocks.length}
         />
       )}
 
@@ -500,22 +524,39 @@ interface BlockCardProps {
 }
 
 function BlockCard({ block, onClick, accentColor }: BlockCardProps) {
+  const hasIssues = hasPlaceholders(block.title) ||
+    hasPlaceholders(block.purpose) ||
+    hasPlaceholders(block.talk_track_md) ||
+    !block.talk_track_md ||
+    block.talk_track_md.trim().length === 0;
+
+  const wordCount = block.talk_track_md ? block.talk_track_md.split(/\s+/).filter(w => w.length > 0).length : 0;
+  const isLowContent = wordCount > 0 && wordCount < 30;
+
   return (
     <button
       onClick={onClick}
-      className="w-full text-left p-3 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98]"
+      className="w-full text-left p-3 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] relative"
       style={{
         background: 'rgb(var(--surface-base))',
-        border: '1px solid rgb(var(--border-subtle))',
+        border: hasIssues ? '1px solid rgb(var(--error))' : isLowContent ? '1px solid rgb(var(--warning))' : '1px solid rgb(var(--border-subtle))',
       }}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
-        <span
-          className="text-xs font-mono font-bold px-1.5 py-0.5 rounded"
-          style={{ background: accentColor, color: 'white' }}
-        >
-          {block.block_id}
-        </span>
+        <div className="flex items-center gap-1">
+          <span
+            className="text-xs font-mono font-bold px-1.5 py-0.5 rounded"
+            style={{ background: accentColor, color: 'white' }}
+          >
+            {block.block_id}
+          </span>
+          {hasIssues && (
+            <AlertTriangle className="w-3 h-3" style={{ color: 'rgb(var(--error))' }} />
+          )}
+          {!hasIssues && isLowContent && (
+            <AlertTriangle className="w-3 h-3" style={{ color: 'rgb(var(--warning))' }} />
+          )}
+        </div>
         <div className="flex items-center gap-1 text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
           <Clock className="w-3 h-3" />
           {block.timebox_minutes}m

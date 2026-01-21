@@ -109,7 +109,8 @@ export function ScriptModeView({
     setActiveBlockId(blockId);
     const element = document.getElementById(`block-${blockId}`);
     if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => setActiveBlockId(null), 3000);
     }
   };
 
@@ -262,6 +263,7 @@ export function ScriptModeView({
                   onEdit={() => onBlockEdit(block.block_id)}
                   onNavigateToTab={onNavigateToTab}
                   searchQuery={searchQuery}
+                  isActive={activeBlockId === block.block_id}
                 />
               );
             })}

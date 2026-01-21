@@ -12,21 +12,39 @@ import {
   Edit3,
   Plus,
   Trash2,
+  ChevronLeft,
+  ChevronRight,
+  CheckCircle2,
 } from 'lucide-react';
 import type { WR2Block } from '../../contracts';
+import { useToast } from '../context/ToastContext';
 
 interface BlockDetailSlideoutProps {
   block: WR2Block;
   onClose: () => void;
   onSave: (block: WR2Block) => Promise<void>;
+  onNavigateNext?: () => void;
+  onNavigatePrev?: () => void;
+  blockIndex?: number;
+  totalBlocks?: number;
 }
 
-export function BlockDetailSlideout({ block, onClose, onSave }: BlockDetailSlideoutProps) {
+export function BlockDetailSlideout({
+  block,
+  onClose,
+  onSave,
+  onNavigateNext,
+  onNavigatePrev,
+  blockIndex,
+  totalBlocks
+}: BlockDetailSlideoutProps) {
+  const toast = useToast();
   const [editedBlock, setEditedBlock] = useState<WR2Block>({ ...block });
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [activeSection, setActiveSection] = useState<'content' | 'transitions' | 'proof'>('content');
   const [previewMode, setPreviewMode] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
 
   useEffect(() => {
     setEditedBlock({ ...block });
@@ -36,12 +54,44 @@ export function BlockDetailSlideout({ block, onClose, onSave }: BlockDetailSlide
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        if (hasChanges) {
+          const confirm = window.confirm('You have unsaved changes. Are you sure you want to close?');
+          if (confirm) {
+            onClose();
+          }
+        } else {
+          onClose();
+        }
+      } else if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        if (hasChanges && !isSaving) {
+          handleSave();
+        }
+      } else if (e.key === 'ArrowLeft' && e.altKey && onNavigatePrev) {
+        e.preventDefault();
+        if (hasChanges) {
+          const confirm = window.confirm('You have unsaved changes. Save before navigating?');
+          if (confirm) {
+            handleSave().then(() => onNavigatePrev());
+          }
+        } else {
+          onNavigatePrev();
+        }
+      } else if (e.key === 'ArrowRight' && e.altKey && onNavigateNext) {
+        e.preventDefault();
+        if (hasChanges) {
+          const confirm = window.confirm('You have unsaved changes. Save before navigating?');
+          if (confirm) {
+            handleSave().then(() => onNavigateNext());
+          }
+        } else {
+          onNavigateNext();
+        }
       }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [onClose, hasChanges, isSaving, onNavigateNext, onNavigatePrev]);
 
   const updateField = useCallback(<K extends keyof WR2Block>(field: K, value: WR2Block[K]) => {
     setEditedBlock(prev => ({ ...prev, [field]: value }));
@@ -53,6 +103,11 @@ export function BlockDetailSlideout({ block, onClose, onSave }: BlockDetailSlide
     try {
       await onSave(editedBlock);
       setHasChanges(false);
+      setLastSavedAt(new Date());
+      toast.showSuccess(`Block ${editedBlock.block_id} saved successfully`);
+    } catch (error) {
+      toast.showError('Failed to save block. Please try again.');
+      console.error('Save error:', error);
     } finally {
       setIsSaving(false);
     }
@@ -101,28 +156,55 @@ export function BlockDetailSlideout({ block, onClose, onSave }: BlockDetailSlide
           }}
         >
           <div className="flex items-center gap-3">
-            <span
-              className="text-sm font-mono font-bold px-2 py-1 rounded"
-              style={{ background: colors.accent, color: 'white' }}
-            >
-              {editedBlock.block_id}
-            </span>
-            <span
-              className="text-xs px-2 py-1 rounded-full capitalize"
-              style={{
-                background: 'rgb(var(--surface-base))',
-                color: 'rgb(var(--text-muted))',
-              }}
-            >
-              {editedBlock.phase}
-            </span>
+            {onNavigatePrev && (
+              <button
+                onClick={onNavigatePrev}
+                disabled={!onNavigatePrev}
+                className="btn-ghost p-2"
+                title="Previous block (Alt + Left)"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+            )}
+            <div className="flex items-center gap-3">
+              <span
+                className="text-sm font-mono font-bold px-2 py-1 rounded"
+                style={{ background: colors.accent, color: 'white' }}
+              >
+                {editedBlock.block_id}
+              </span>
+              <span
+                className="text-xs px-2 py-1 rounded-full capitalize"
+                style={{
+                  background: 'rgb(var(--surface-base))',
+                  color: 'rgb(var(--text-muted))',
+                }}
+              >
+                {editedBlock.phase}
+              </span>
+              {blockIndex !== undefined && totalBlocks !== undefined && (
+                <span className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+                  Block {blockIndex + 1} of {totalBlocks}
+                </span>
+              )}
+            </div>
+            {onNavigateNext && (
+              <button
+                onClick={onNavigateNext}
+                disabled={!onNavigateNext}
+                className="btn-ghost p-2"
+                title="Next block (Alt + Right)"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => setPreviewMode(!previewMode)} className="btn-ghost text-sm">
               {previewMode ? <Edit3 className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               {previewMode ? 'Edit' : 'Preview'}
             </button>
-            <button onClick={onClose} className="btn-ghost p-2">
+            <button onClick={onClose} className="btn-ghost p-2" title="Close (Esc)">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -131,9 +213,21 @@ export function BlockDetailSlideout({ block, onClose, onSave }: BlockDetailSlide
         <div className="flex-1 overflow-y-auto scrollbar-thin">
           <div className="p-6 space-y-6">
             <div>
-              <label className="block text-xs font-medium uppercase tracking-wide mb-2" style={{ color: 'rgb(var(--text-muted))' }}>
-                Title
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-medium uppercase tracking-wide" style={{ color: 'rgb(var(--text-muted))' }}>
+                  Title
+                </label>
+                {!previewMode && (
+                  <span
+                    className="text-xs"
+                    style={{
+                      color: editedBlock.title.length > 100 ? 'rgb(var(--error))' : 'rgb(var(--text-muted))'
+                    }}
+                  >
+                    {editedBlock.title.length}/100
+                  </span>
+                )}
+              </div>
               {previewMode ? (
                 <p className="text-lg font-semibold" style={{ color: 'rgb(var(--text-primary))' }}>
                   {editedBlock.title}
@@ -144,6 +238,7 @@ export function BlockDetailSlideout({ block, onClose, onSave }: BlockDetailSlide
                   value={editedBlock.title}
                   onChange={(e) => updateField('title', e.target.value)}
                   className="input-field text-lg font-semibold"
+                  maxLength={100}
                 />
               )}
             </div>
@@ -216,10 +311,20 @@ export function BlockDetailSlideout({ block, onClose, onSave }: BlockDetailSlide
             {activeSection === 'content' && (
               <div className="space-y-6">
                 <div>
-                  <label className="block text-xs font-medium uppercase tracking-wide mb-2" style={{ color: 'rgb(var(--text-muted))' }}>
-                    <FileText className="w-3.5 h-3.5 inline mr-1" />
-                    Talk Track (Markdown)
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-medium uppercase tracking-wide" style={{ color: 'rgb(var(--text-muted))' }}>
+                      <FileText className="w-3.5 h-3.5 inline mr-1" />
+                      Talk Track (Markdown)
+                    </label>
+                    {!previewMode && (
+                      <span className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+                        {editedBlock.talk_track_md.split(/\s+/).filter(w => w.length > 0).length} words
+                        {editedBlock.talk_track_md.length > 0 && editedBlock.talk_track_md.split(/\s+/).filter(w => w.length > 0).length < 50 && (
+                          <span style={{ color: 'rgb(var(--warning))' }}> (seems short)</span>
+                        )}
+                      </span>
+                    )}
+                  </div>
                   {previewMode ? (
                     <div
                       className="p-4 rounded-xl text-sm whitespace-pre-wrap"
@@ -411,8 +516,24 @@ export function BlockDetailSlideout({ block, onClose, onSave }: BlockDetailSlide
             borderColor: 'rgb(var(--border-default))',
           }}
         >
-          <div className="text-sm" style={{ color: 'rgb(var(--text-muted))' }}>
-            {hasChanges ? 'Unsaved changes' : 'No changes'}
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2 text-sm">
+              {hasChanges ? (
+                <span style={{ color: 'rgb(var(--warning))' }}>Unsaved changes</span>
+              ) : lastSavedAt ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4" style={{ color: 'rgb(var(--success))' }} />
+                  <span style={{ color: 'rgb(var(--text-muted))' }}>
+                    Saved at {lastSavedAt.toLocaleTimeString()}
+                  </span>
+                </>
+              ) : (
+                <span style={{ color: 'rgb(var(--text-muted))' }}>No changes</span>
+              )}
+            </div>
+            <div className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
+              {hasChanges && '⌘S to save • '}Esc to close{onNavigateNext && ' • Alt+← → to navigate'}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={onClose} className="btn-ghost">
@@ -422,6 +543,7 @@ export function BlockDetailSlideout({ block, onClose, onSave }: BlockDetailSlide
               onClick={handleSave}
               disabled={!hasChanges || isSaving}
               className={`btn-primary ${!hasChanges ? 'opacity-50' : ''}`}
+              title="Save changes (⌘S)"
             >
               <Save className={`w-4 h-4 ${isSaving ? 'animate-pulse' : ''}`} />
               {isSaving ? 'Saving...' : 'Save Changes'}
