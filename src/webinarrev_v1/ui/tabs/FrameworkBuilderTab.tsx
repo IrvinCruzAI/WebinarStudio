@@ -18,7 +18,6 @@ import { DurationTrustDashboard } from '../components/DurationTrustDashboard';
 import { checkRequiredSettings, type SettingsWarning } from '../../utils/settingsChecker';
 import { SettingsWarningModal } from '../modals/SettingsWarningModal';
 import { ScriptModeView } from '../components/ScriptModeView';
-import { DeliverModeView } from '../components/DeliverModeView';
 
 interface FrameworkBuilderTabProps {
   project: ProjectMetadata;
@@ -50,7 +49,7 @@ export function FrameworkBuilderTab({
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [showSettingsWarning, setShowSettingsWarning] = useState(false);
   const [settingsWarnings, setSettingsWarnings] = useState<SettingsWarning[]>([]);
-  const [viewMode, setViewMode] = useState<'board' | 'script' | 'deliver'>('board');
+  const [viewMode, setViewMode] = useState<'board' | 'script'>('board');
 
   const wr2Artifact = artifacts.get('WR2');
   const wr1Artifact = artifacts.get('WR1');
@@ -229,17 +228,6 @@ export function FrameworkBuilderTab({
                   <FileTextIcon className="w-4 h-4" />
                   Script
                 </button>
-                <button
-                  onClick={() => setViewMode('deliver')}
-                  className={`px-3 py-1.5 text-sm font-medium rounded transition-colors flex items-center gap-1.5 ${
-                    viewMode === 'deliver'
-                      ? 'bg-[rgb(var(--accent-primary))] text-white'
-                      : 'text-[rgb(var(--text-muted))] hover:text-[rgb(var(--text-primary))]'
-                  }`}
-                >
-                  <Play className="w-4 h-4" />
-                  Deliver
-                </button>
               </div>
               {onRegenerate && (
                 <div className="relative">
@@ -382,11 +370,6 @@ export function FrameworkBuilderTab({
               </div>
             </>
           )}
-          {viewMode === 'script' && (
-            <div className="text-sm" style={{ color: 'rgb(var(--text-muted))' }}>
-              Full script view with timestamps and pacing guidance
-            </div>
-          )}
         </div>
       </div>
 
@@ -421,7 +404,7 @@ export function FrameworkBuilderTab({
             </div>
           </div>
         </div>
-      ) : viewMode === 'script' ? (
+      ) : (
         <ScriptModeView
           wr2={wr2}
           wr6={wr6}
@@ -429,18 +412,6 @@ export function FrameworkBuilderTab({
           onBlockEdit={handleBlockClick}
           onNavigateToTab={onNavigateToTab}
           onRunPipeline={handleRunPipeline}
-        />
-      ) : (
-        <DeliverModeView
-          wr2={wr2}
-          wr6={wr6}
-          project={project}
-          onNavigateToTab={(route) => {
-            if (onNavigateToTab) {
-              onNavigateToTab(route.tab);
-            }
-          }}
-          onExitDeliverMode={() => setViewMode('board')}
         />
       )}
 
