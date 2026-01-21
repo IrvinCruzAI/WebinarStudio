@@ -139,16 +139,14 @@ export function ProjectHeader({
 
 function StatusBadge({ status }: { status: ProjectMetadata['status'] }) {
   const config: Record<string, { class: string; label: string }> = {
-    draft: { class: 'badge-neutral', label: 'Draft' },
+    preflight_blocked: { class: 'badge-error', label: 'Blocked' },
     generating: { class: 'badge-accent', label: 'Generating' },
     review: { class: 'badge-warning', label: 'Review' },
     ready: { class: 'badge-success', label: 'Ready' },
-    blocked: { class: 'badge-error', label: 'Blocked' },
-    exportable: { class: 'badge-success', label: 'Exportable' },
     failed: { class: 'badge-error', label: 'Failed' },
   };
 
-  const { class: className, label } = config[status] || config.draft;
+  const { class: className, label } = config[status] || config.review;
 
   return <span className={`badge ${className}`}>{label}</span>;
 }

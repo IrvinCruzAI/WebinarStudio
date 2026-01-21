@@ -43,8 +43,8 @@ export function ProjectsHome({
   const filteredProjects = projects.filter(p => {
     switch (filterBy) {
       case 'running': return p.status === 'generating';
-      case 'needs_fixes': return p.status === 'blocked' || p.status === 'review';
-      case 'exportable': return p.status === 'exportable';
+      case 'needs_fixes': return p.status === 'preflight_blocked' || p.status === 'review' || p.status === 'failed';
+      case 'exportable': return p.status === 'ready';
       default: return true;
     }
   });
@@ -281,7 +281,7 @@ function ProjectCard({ project, onClick, onDelete }: ProjectCardProps) {
         </div>
       </div>
 
-      {project.status === 'exportable' && (
+      {project.status === 'ready' && (
         <div
           className="mt-4 pt-4 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity"
           style={{ borderTop: '1px solid rgb(var(--border-subtle))' }}
@@ -298,15 +298,14 @@ function ProjectCard({ project, onClick, onDelete }: ProjectCardProps) {
 
 function StatusBadge({ status }: { status: ProjectMetadata['status'] }) {
   const configs: Record<string, { icon: typeof CheckCircle2; class: string; label: string }> = {
-    draft: { icon: FolderOpen, class: 'badge-neutral', label: 'Draft' },
+    preflight_blocked: { icon: AlertCircle, class: 'badge-error', label: 'Blocked' },
     generating: { icon: Loader2, class: 'badge-accent', label: 'Running' },
     review: { icon: AlertCircle, class: 'badge-warning', label: 'Review' },
-    blocked: { icon: XCircle, class: 'badge-error', label: 'Blocked' },
-    exportable: { icon: CheckCircle2, class: 'badge-success', label: 'Ready' },
+    ready: { icon: CheckCircle2, class: 'badge-success', label: 'Ready' },
     failed: { icon: XCircle, class: 'badge-error', label: 'Failed' },
   };
 
-  const config = configs[status] || configs.draft;
+  const config = configs[status] || configs.review;
   const Icon = config.icon;
 
   return (

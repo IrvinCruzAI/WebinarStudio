@@ -280,11 +280,10 @@ export function AppShell({
 
 function getStatusLabel(status: ProjectMetadata['status']): string {
   switch (status) {
-    case 'draft': return 'Draft';
+    case 'preflight_blocked': return 'Blocked';
     case 'generating': return 'Generating...';
     case 'review': return 'Ready for Review';
-    case 'blocked': return 'Needs Fixes';
-    case 'exportable': return 'Ready to Export';
+    case 'ready': return 'Ready to Export';
     case 'failed': return 'Failed';
     default: return status;
   }
