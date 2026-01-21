@@ -184,9 +184,11 @@ interface ProjectCardProps {
 }
 
 function ProjectCard({ project, onClick, onDelete }: ProjectCardProps) {
-  const completedCount = Object.values(project.deliverable_pointers || {})
-    .filter(p => p?.validated).length;
-  const totalCount = UI_DELIVERABLE_ORDER.filter(id => DELIVERABLES[id].exportable).length;
+  const exportableIds = UI_DELIVERABLE_ORDER.filter(id => DELIVERABLES[id].exportable);
+  const completedCount = exportableIds.filter(id =>
+    project.deliverable_pointers?.[id]?.validated
+  ).length;
+  const totalCount = exportableIds.length;
   const progress = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
 
   const handleDelete = (e: React.MouseEvent) => {
