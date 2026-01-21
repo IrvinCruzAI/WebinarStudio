@@ -136,6 +136,7 @@ function V1AppContent() {
               onRunPipeline={runPipeline}
               onEditDeliverable={handleEditDeliverable}
               onRegenerateExecutiveSummary={regenerateExecutiveSummary}
+              onNavigateToTab={tab => setActiveTab(tab as TabId)}
             />
           )}
 
@@ -147,11 +148,13 @@ function V1AppContent() {
               onRunPipeline={runPipeline}
               onEditDeliverable={handleEditDeliverable}
               onRegenerate={handleRegenerate}
+              onNavigateToTab={tab => setActiveTab(tab as TabId)}
             />
           )}
 
           {activeTab === 'assets' && (
             <AssetsTab
+              project={selectedProject}
               artifacts={artifacts}
               onRevalidate={revalidateDeliverable}
               onExportDocx={exportDocx}
@@ -159,6 +162,7 @@ function V1AppContent() {
               onRegenerate={handleRegenerate}
               isPipelineRunning={isPipelineRunning}
               onRunPipeline={runPipeline}
+              onNavigateToTab={tab => setActiveTab(tab as TabId)}
             />
           )}
 

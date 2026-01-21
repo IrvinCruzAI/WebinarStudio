@@ -32,6 +32,8 @@ import { TextMetrics } from '../components/TextMetrics';
 import { FileUploadButton } from '../components/FileUploadButton';
 import { assessInputQuality } from '../../utils/inputQuality';
 import { InputQualityIndicator } from '../components/InputQualityIndicator';
+import { checkRequiredSettings, type SettingsWarning } from '../../utils/settingsChecker';
+import { SettingsWarningModal } from '../modals/SettingsWarningModal';
 
 interface TranscriptData {
   build_transcript: string;
@@ -89,6 +91,8 @@ export function ProjectSetupTab({
   const [editedSenderName, setEditedSenderName] = useState(project.settings?.operator?.sender_name || '');
   const [editedSenderEmail, setEditedSenderEmail] = useState(project.settings?.operator?.sender_email || '');
   const [editedReplyToEmail, setEditedReplyToEmail] = useState(project.settings?.operator?.reply_to_email || '');
+  const [showSettingsWarning, setShowSettingsWarning] = useState(false);
+  const [settingsWarnings, setSettingsWarnings] = useState<SettingsWarning[]>([]);
 
   const loadTranscripts = useCallback(async () => {
     setIsLoadingTranscripts(true);
@@ -197,6 +201,25 @@ export function ProjectSetupTab({
     setIsEditingUrls(false);
   };
 
+  const handleRunPipeline = () => {
+    const warnings = checkRequiredSettings(project.settings?.operator || {});
+    if (warnings.length > 0) {
+      setSettingsWarnings(warnings);
+      setShowSettingsWarning(true);
+    } else {
+      onRunPipeline();
+    }
+  };
+
+  const handleGenerateAnyway = () => {
+    setShowSettingsWarning(false);
+    onRunPipeline();
+  };
+
+  const handleConfigureSettings = () => {
+    setShowSettingsWarning(false);
+    setExpandedSections(prev => new Set(prev).add('operator'));
+  };
 
   const handleSaveTranscripts = async () => {
     setIsSaving(true);
@@ -271,7 +294,7 @@ export function ProjectSetupTab({
                 </p>
               </div>
             </div>
-            <button onClick={onRunPipeline} disabled={isPipelineRunning} className="btn-primary text-sm">
+            <button onClick={handleRunPipeline} disabled={isPipelineRunning} className="btn-primary text-sm">
               <RefreshCw className="w-4 h-4" />
               Regenerate
             </button>
@@ -439,7 +462,7 @@ export function ProjectSetupTab({
                   Settings changed. Regenerate to apply new configuration.
                 </span>
               </div>
-              <button onClick={onRunPipeline} disabled={isPipelineRunning} className="btn-primary text-xs">
+              <button onClick={handleRunPipeline} disabled={isPipelineRunning} className="btn-primary text-xs">
                 <RefreshCw className="w-3.5 h-3.5" />
                 Regenerate
               </button>
@@ -1245,6 +1268,13 @@ function ProcessedTranscriptSection({
           </p>
         </div>
       )}
+      <SettingsWarningModal
+        isOpen={showSettingsWarning}
+        warnings={settingsWarnings}
+        onClose={() => setShowSettingsWarning(false)}
+        onGenerateAnyway={handleGenerateAnyway}
+        onConfigureSettings={handleConfigureSettings}
+      />
     </div>
   );
 }

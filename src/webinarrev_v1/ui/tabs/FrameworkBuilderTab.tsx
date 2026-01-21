@@ -13,6 +13,8 @@ import type { ProjectMetadata, DeliverableId, WR2, WR2Block, BlockId, BlockPhase
 import { PHASE_MAPPING } from '../../contracts/enums';
 import { BlockDetailSlideout } from '../components/BlockDetailSlideout';
 import { DurationTrustDashboard } from '../components/DurationTrustDashboard';
+import { checkRequiredSettings, type SettingsWarning } from '../../utils/settingsChecker';
+import { SettingsWarningModal } from '../modals/SettingsWarningModal';
 
 interface FrameworkBuilderTabProps {
   project: ProjectMetadata;
@@ -26,6 +28,7 @@ interface FrameworkBuilderTabProps {
   onRunPipeline: () => void;
   onEditDeliverable: (id: DeliverableId, field: string, value: unknown) => Promise<void>;
   onRegenerate?: (id: DeliverableId, cascade: boolean) => Promise<void>;
+  onNavigateToTab?: (tab: string) => void;
 }
 
 export function FrameworkBuilderTab({
@@ -35,11 +38,14 @@ export function FrameworkBuilderTab({
   onRunPipeline,
   onEditDeliverable,
   onRegenerate,
+  onNavigateToTab,
 }: FrameworkBuilderTabProps) {
   const [selectedBlockIndex, setSelectedBlockIndex] = useState<number | null>(null);
   const [jumpToBlock, setJumpToBlock] = useState<string>('');
   const [showRegenerateMenu, setShowRegenerateMenu] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [showSettingsWarning, setShowSettingsWarning] = useState(false);
+  const [settingsWarnings, setSettingsWarnings] = useState<SettingsWarning[]>([]);
 
   const wr2Artifact = artifacts.get('WR2');
   const wr1Artifact = artifacts.get('WR1');
@@ -111,6 +117,28 @@ export function FrameworkBuilderTab({
     }
   };
 
+  const handleRunPipeline = () => {
+    const warnings = checkRequiredSettings(project.settings?.operator || {});
+    if (warnings.length > 0) {
+      setSettingsWarnings(warnings);
+      setShowSettingsWarning(true);
+    } else {
+      onRunPipeline();
+    }
+  };
+
+  const handleGenerateAnyway = () => {
+    setShowSettingsWarning(false);
+    onRunPipeline();
+  };
+
+  const handleConfigureSettings = () => {
+    setShowSettingsWarning(false);
+    if (onNavigateToTab) {
+      onNavigateToTab('project-setup');
+    }
+  };
+
   if (!wr2) {
     return (
       <div className="flex-1 overflow-auto p-6">
@@ -133,7 +161,7 @@ export function FrameworkBuilderTab({
               Run the pipeline to generate the 21-block framework
             </p>
             <button
-              onClick={onRunPipeline}
+              onClick={handleRunPipeline}
               disabled={isPipelineRunning}
               className="btn-primary"
             >
@@ -142,6 +170,13 @@ export function FrameworkBuilderTab({
             </button>
           </div>
         </div>
+        <SettingsWarningModal
+          isOpen={showSettingsWarning}
+          warnings={settingsWarnings}
+          onClose={() => setShowSettingsWarning(false)}
+          onGenerateAnyway={handleGenerateAnyway}
+          onConfigureSettings={handleConfigureSettings}
+        />
       </div>
     );
   }
@@ -249,7 +284,7 @@ export function FrameworkBuilderTab({
                   Client profile (WR1) was modified. Framework may be outdated.
                 </span>
               </div>
-              <button onClick={onRunPipeline} disabled={isPipelineRunning} className="btn-primary text-sm">
+              <button onClick={handleRunPipeline} disabled={isPipelineRunning} className="btn-primary text-sm">
                 <Play className="w-4 h-4" />
                 Re-run
               </button>
@@ -342,6 +377,14 @@ export function FrameworkBuilderTab({
           onSave={handleSaveBlock}
         />
       )}
+
+      <SettingsWarningModal
+        isOpen={showSettingsWarning}
+        warnings={settingsWarnings}
+        onClose={() => setShowSettingsWarning(false)}
+        onGenerateAnyway={handleGenerateAnyway}
+        onConfigureSettings={handleConfigureSettings}
+      />
     </div>
   );
 }

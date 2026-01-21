@@ -30,6 +30,8 @@ import { EditableField, EditableTextArea } from '../components/EditableField';
 import { readTranscript } from '../../store/storageService';
 import { useEffect } from 'react';
 import { hasExecutiveSummaryError } from '../../pipeline/orchestrator';
+import { checkRequiredSettings, type SettingsWarning } from '../../utils/settingsChecker';
+import { SettingsWarningModal } from '../modals/SettingsWarningModal';
 
 interface DossierTabProps {
   project: ProjectMetadata;
@@ -43,6 +45,7 @@ interface DossierTabProps {
   onRunPipeline: () => void;
   onEditDeliverable: (id: DeliverableId, field: string, value: unknown) => Promise<void>;
   onRegenerateExecutiveSummary?: () => Promise<void>;
+  onNavigateToTab?: (tab: string) => void;
 }
 
 interface QAResolution {
@@ -58,6 +61,7 @@ export function DossierTab({
   onRunPipeline,
   onEditDeliverable,
   onRegenerateExecutiveSummary,
+  onNavigateToTab,
 }: DossierTabProps) {
   const [viewMode, setViewMode] = useState<'formatted' | 'json'>('formatted');
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
@@ -65,6 +69,8 @@ export function DossierTab({
   );
   const [qaResolutions, setQaResolutions] = useState<Map<string, QAResolution>>(new Map());
   const [operatorNotes, setOperatorNotes] = useState<string>('');
+  const [showSettingsWarning, setShowSettingsWarning] = useState(false);
+  const [settingsWarnings, setSettingsWarnings] = useState<SettingsWarning[]>([]);
 
   const wr1Artifact = artifacts.get('WR1');
   const wr1 = wr1Artifact?.content as WR1 | undefined;
@@ -135,6 +141,28 @@ export function DossierTab({
 
   const isFieldEdited = (fieldPath: string) => editedFields.includes(fieldPath);
 
+  const handleRunPipeline = () => {
+    const warnings = checkRequiredSettings(project.settings?.operator || {});
+    if (warnings.length > 0) {
+      setSettingsWarnings(warnings);
+      setShowSettingsWarning(true);
+    } else {
+      onRunPipeline();
+    }
+  };
+
+  const handleGenerateAnyway = () => {
+    setShowSettingsWarning(false);
+    onRunPipeline();
+  };
+
+  const handleConfigureSettings = () => {
+    setShowSettingsWarning(false);
+    if (onNavigateToTab) {
+      onNavigateToTab('project-setup');
+    }
+  };
+
   const handleQAResolve = (category: string, index: number, resolution: string) => {
     const key = `${category}-${index}`;
     setQaResolutions(prev => {
@@ -188,7 +216,7 @@ export function DossierTab({
               Run the pipeline to generate the client profile dossier
             </p>
             <button
-              onClick={onRunPipeline}
+              onClick={handleRunPipeline}
               disabled={isPipelineRunning}
               className="btn-primary"
             >
@@ -197,6 +225,13 @@ export function DossierTab({
             </button>
           </div>
         </div>
+        <SettingsWarningModal
+          isOpen={showSettingsWarning}
+          warnings={settingsWarnings}
+          onClose={() => setShowSettingsWarning(false)}
+          onGenerateAnyway={handleGenerateAnyway}
+          onConfigureSettings={handleConfigureSettings}
+        />
       </div>
     );
   }
@@ -245,7 +280,7 @@ export function DossierTab({
               project={project}
               expanded={expandedSections.has('summary')}
               onToggle={() => toggleSection('summary')}
-              onRunPipeline={onRunPipeline}
+              onRunPipeline={handleRunPipeline}
               isPipelineRunning={isPipelineRunning}
               onRegenerateExecutiveSummary={onRegenerateExecutiveSummary}
             />
@@ -418,6 +453,13 @@ export function DossierTab({
           </>
         )}
       </div>
+      <SettingsWarningModal
+        isOpen={showSettingsWarning}
+        warnings={settingsWarnings}
+        onClose={() => setShowSettingsWarning(false)}
+        onGenerateAnyway={handleGenerateAnyway}
+        onConfigureSettings={handleConfigureSettings}
+      />
     </div>
   );
 }

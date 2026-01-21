@@ -25,12 +25,15 @@ import { SocialPostsEditor } from '../components/editors/SocialPostsEditor';
 import { TimelineEditor } from '../components/editors/TimelineEditor';
 import { ChecklistEditor } from '../components/editors/ChecklistEditor';
 import { DeckPromptEditor } from '../components/editors/DeckPromptEditor';
+import { checkRequiredSettings, type SettingsWarning } from '../../utils/settingsChecker';
+import { SettingsWarningModal } from '../modals/SettingsWarningModal';
 
 type ViewMode = 'preview' | 'edit' | 'json';
 
 const ASSETS_DELIVERABLES: DeliverableId[] = ['WR3', 'WR4', 'WR5', 'WR6', 'WR7', 'WR8'];
 
 interface AssetsTabProps {
+  project?: { settings?: { operator?: Record<string, unknown> } };
   artifacts: Map<DeliverableId, {
     content: unknown;
     validated: boolean;
@@ -43,9 +46,11 @@ interface AssetsTabProps {
   onRegenerate?: (id: DeliverableId, cascade: boolean) => Promise<void>;
   isPipelineRunning?: boolean;
   onRunPipeline?: () => void;
+  onNavigateToTab?: (tab: string) => void;
 }
 
 export function AssetsTab({
+  project,
   artifacts,
   onRevalidate,
   onExportDocx,
@@ -53,6 +58,7 @@ export function AssetsTab({
   onRegenerate,
   isPipelineRunning,
   onRunPipeline,
+  onNavigateToTab,
 }: AssetsTabProps) {
   const [selectedAsset, setSelectedAsset] = useState<DeliverableId | null>(null);
   const [isRevalidating, setIsRevalidating] = useState<DeliverableId | null>(null);
@@ -60,6 +66,8 @@ export function AssetsTab({
   const [viewMode, setViewMode] = useState<ViewMode>('preview');
   const [showRegenerateMenu, setShowRegenerateMenu] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [showSettingsWarning, setShowSettingsWarning] = useState(false);
+  const [settingsWarnings, setSettingsWarnings] = useState<SettingsWarning[]>([]);
 
   const wr1Artifact = artifacts.get('WR1');
   const wr2Artifact = artifacts.get('WR2');
@@ -95,6 +103,31 @@ export function AssetsTab({
     }
   };
 
+  const handleRunPipeline = () => {
+    if (!onRunPipeline) return;
+    const warnings = checkRequiredSettings(project?.settings?.operator || {});
+    if (warnings.length > 0) {
+      setSettingsWarnings(warnings);
+      setShowSettingsWarning(true);
+    } else {
+      onRunPipeline();
+    }
+  };
+
+  const handleGenerateAnyway = () => {
+    setShowSettingsWarning(false);
+    if (onRunPipeline) {
+      onRunPipeline();
+    }
+  };
+
+  const handleConfigureSettings = () => {
+    setShowSettingsWarning(false);
+    if (onNavigateToTab) {
+      onNavigateToTab('project-setup');
+    }
+  };
+
   const selectedArtifact = selectedAsset ? artifacts.get(selectedAsset) : null;
   const selectedMeta = selectedAsset ? DELIVERABLES[selectedAsset] : null;
 
@@ -119,7 +152,7 @@ export function AssetsTab({
               Client profile or framework was modified. Assets may be outdated.
             </span>
           </div>
-          <button onClick={onRunPipeline} disabled={isPipelineRunning} className="btn-primary text-sm">
+          <button onClick={handleRunPipeline} disabled={isPipelineRunning} className="btn-primary text-sm">
             <Play className="w-4 h-4" />
             Re-run Pipeline
           </button>
@@ -351,6 +384,13 @@ export function AssetsTab({
         )}
       </div>
       </div>
+      <SettingsWarningModal
+        isOpen={showSettingsWarning}
+        warnings={settingsWarnings}
+        onClose={() => setShowSettingsWarning(false)}
+        onGenerateAnyway={handleGenerateAnyway}
+        onConfigureSettings={handleConfigureSettings}
+      />
     </div>
   );
 }

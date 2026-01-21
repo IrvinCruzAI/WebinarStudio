@@ -1,7 +1,10 @@
 import { ArrowLeft, Play, Building2, User, Clock } from 'lucide-react';
+import { useState } from 'react';
 import type { ProjectMetadata } from '../../contracts';
 import type { PipelineProgress } from '../../pipeline/orchestrator';
 import PipelineProgressPanel from '../components/PipelineProgressPanel';
+import { checkRequiredSettings, type SettingsWarning } from '../../utils/settingsChecker';
+import { SettingsWarningModal } from '../modals/SettingsWarningModal';
 
 interface ProjectHeaderProps {
   project: ProjectMetadata;
@@ -32,7 +35,29 @@ export function ProjectHeader({
   activeTab,
   onTabChange,
 }: ProjectHeaderProps) {
+  const [showSettingsWarning, setShowSettingsWarning] = useState(false);
+  const [settingsWarnings, setSettingsWarnings] = useState<SettingsWarning[]>([]);
   const hasErrors = pipelineProgress.some(p => p.status === 'error');
+
+  const handleRunPipeline = () => {
+    const warnings = checkRequiredSettings(project.settings?.operator || {});
+    if (warnings.length > 0) {
+      setSettingsWarnings(warnings);
+      setShowSettingsWarning(true);
+    } else {
+      onRunPipeline();
+    }
+  };
+
+  const handleGenerateAnyway = () => {
+    setShowSettingsWarning(false);
+    onRunPipeline();
+  };
+
+  const handleConfigureSettings = () => {
+    setShowSettingsWarning(false);
+    onTabChange('project-setup');
+  };
 
   const infoItems: Array<{ icon?: typeof Building2; label: string }> = [];
 
@@ -86,7 +111,7 @@ export function ProjectHeader({
         <div className="flex items-center gap-3">
           {!isPipelineRunning && pipelineProgress.length === 0 && (
             <button
-              onClick={onRunPipeline}
+              onClick={handleRunPipeline}
               className="btn-primary text-sm"
               disabled={project.status === 'generating'}
             >
@@ -133,6 +158,14 @@ export function ProjectHeader({
           ))}
         </nav>
       </div>
+
+      <SettingsWarningModal
+        isOpen={showSettingsWarning}
+        warnings={settingsWarnings}
+        onClose={() => setShowSettingsWarning(false)}
+        onGenerateAnyway={handleGenerateAnyway}
+        onConfigureSettings={handleConfigureSettings}
+      />
     </header>
   );
 }
