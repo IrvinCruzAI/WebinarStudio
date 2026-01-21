@@ -120,17 +120,6 @@ export function AttentionSummary({ wr2, onBlockClick }: AttentionSummaryProps) {
               {analysis.errors} error{analysis.errors !== 1 ? 's' : ''}
             </span>
           )}
-          {analysis.warnings > 0 && (
-            <span
-              className="px-2 py-1 rounded-full"
-              style={{
-                background: 'rgb(var(--warning) / 0.2)',
-                color: 'rgb(var(--warning))',
-              }}
-            >
-              {analysis.warnings} warning{analysis.warnings !== 1 ? 's' : ''}
-            </span>
-          )}
         </div>
       </div>
 
