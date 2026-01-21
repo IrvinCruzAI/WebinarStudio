@@ -21,14 +21,11 @@ import {
   X,
   Zap,
   Info,
-  Settings,
   Quote,
   HelpCircle,
 } from 'lucide-react';
-import type { ProjectMetadata, DeliverableId, WR1, TranscriptData } from '../../contracts';
+import type { ProjectMetadata, DeliverableId, WR1 } from '../../contracts';
 import { EditableField, EditableTextArea } from '../components/EditableField';
-import { readTranscript } from '../../store/storageService';
-import { useEffect } from 'react';
 import { hasExecutiveSummaryError } from '../../pipeline/orchestrator';
 import { checkRequiredSettings, type SettingsWarning } from '../../utils/settingsChecker';
 import { SettingsWarningModal } from '../modals/SettingsWarningModal';
@@ -65,31 +62,15 @@ export function DossierTab({
 }: DossierTabProps) {
   const [viewMode, setViewMode] = useState<'formatted' | 'json'>('formatted');
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(['context', 'summary', 'client', 'webinar', 'themes', 'proof', 'qa'])
+    new Set(['summary', 'client', 'webinar', 'themes', 'proof', 'qa'])
   );
   const [qaResolutions, setQaResolutions] = useState<Map<string, QAResolution>>(new Map());
-  const [operatorNotes, setOperatorNotes] = useState<string>('');
   const [showSettingsWarning, setShowSettingsWarning] = useState(false);
   const [settingsWarnings, setSettingsWarnings] = useState<SettingsWarning[]>([]);
 
   const wr1Artifact = artifacts.get('WR1');
   const wr1 = wr1Artifact?.content as WR1 | undefined;
   const editedFields = wr1?.edited_fields || [];
-
-  useEffect(() => {
-    loadOperatorNotes();
-  }, [project.project_id]);
-
-  const loadOperatorNotes = async () => {
-    try {
-      const transcript = await readTranscript(project.project_id) as TranscriptData | null;
-      if (transcript?.operator_notes) {
-        setOperatorNotes(transcript.operator_notes);
-      }
-    } catch {
-      // Ignore errors
-    }
-  };
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => {
@@ -273,8 +254,6 @@ export function DossierTab({
           <JsonViewer content={wr1} />
         ) : (
           <>
-            <IntakeContextBanner project={project} operatorNotes={operatorNotes} />
-
             <TransformationSummary
               wr1={wr1}
               project={project}
@@ -373,6 +352,8 @@ export function DossierTab({
                     onSave={handleFieldSave}
                     onRevert={handleFieldRevert}
                   />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
                   <EditableField
                     label="Primary CTA Type"
                     value={wr1.parsed_intake.primary_cta_type}
@@ -381,6 +362,23 @@ export function DossierTab({
                     onSave={handleFieldSave}
                     onRevert={handleFieldRevert}
                   />
+                  <div>
+                    <label className="text-xs font-medium uppercase tracking-wide" style={{ color: 'rgb(var(--text-muted))' }}>
+                      Target Duration
+                    </label>
+                    <div
+                      className="mt-1 p-3 rounded-lg flex items-center gap-2"
+                      style={{
+                        background: 'rgb(var(--surface-base))',
+                        border: '1px solid rgb(var(--border-subtle))',
+                      }}
+                    >
+                      <Clock className="w-4 h-4" style={{ color: 'rgb(var(--text-muted))' }} />
+                      <span className="text-sm font-medium" style={{ color: 'rgb(var(--text-primary))' }}>
+                        {project.settings.webinar_length_minutes} minutes
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </DossierSection>
@@ -504,129 +502,6 @@ function CompletenessRing({ score }: { score: number }) {
       >
         {score}%
       </span>
-    </div>
-  );
-}
-
-interface IntakeContextBannerProps {
-  project: ProjectMetadata;
-  operatorNotes: string;
-}
-
-function IntakeContextBanner({ project, operatorNotes }: IntakeContextBannerProps) {
-  const [showNotes, setShowNotes] = useState(false);
-
-  const tempLabels = {
-    cold: { label: 'Cold Audience', desc: 'Needs education', color: '--accent-secondary' },
-    warm: { label: 'Warm Audience', desc: 'Exploring solutions', color: '--warning' },
-    hot: { label: 'Hot Audience', desc: 'Ready to act', color: '--error' },
-  };
-
-  const ctaLabels = {
-    book_call: { label: 'Book a Call', desc: 'High-touch conversion' },
-    buy_now: { label: 'Direct Purchase', desc: 'Lower-friction conversion' },
-  };
-
-  const temp = tempLabels[project.settings.audience_temperature];
-  const cta = ctaLabels[project.settings.cta_mode];
-
-  return (
-    <div
-      className="rounded-xl p-5 transition-all hover:shadow-sm"
-      style={{
-        background: 'rgb(var(--surface-elevated))',
-        border: '1.5px solid rgb(var(--border-default))',
-      }}
-    >
-      <div className="flex items-center gap-2.5 mb-4">
-        <Settings className="w-4 h-4" style={{ color: 'rgb(var(--accent-primary))' }} />
-        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'rgb(var(--text-muted))' }}>
-          Generation Context
-        </span>
-      </div>
-
-      <div className="grid grid-cols-3 gap-4">
-        <div className="flex items-center gap-3">
-          <div
-            className="p-2 rounded-lg"
-            style={{ background: `rgb(var(${temp.color}) / 0.1)` }}
-          >
-            <Thermometer className="w-4 h-4" style={{ color: `rgb(var(${temp.color}))` }} />
-          </div>
-          <div>
-            <p className="text-sm font-medium" style={{ color: 'rgb(var(--text-primary))' }}>
-              {temp.label}
-            </p>
-            <p className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
-              {temp.desc}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div
-            className="p-2 rounded-lg"
-            style={{ background: 'rgb(var(--accent-primary) / 0.1)' }}
-          >
-            <Target className="w-4 h-4" style={{ color: 'rgb(var(--accent-primary))' }} />
-          </div>
-          <div>
-            <p className="text-sm font-medium" style={{ color: 'rgb(var(--text-primary))' }}>
-              {cta.label}
-            </p>
-            <p className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
-              {cta.desc}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div
-            className="p-2 rounded-lg"
-            style={{ background: 'rgb(var(--surface-base))' }}
-          >
-            <Clock className="w-4 h-4" style={{ color: 'rgb(var(--text-muted))' }} />
-          </div>
-          <div>
-            <p className="text-sm font-medium" style={{ color: 'rgb(var(--text-primary))' }}>
-              {project.settings.webinar_length_minutes} Minutes
-            </p>
-            <p className="text-xs" style={{ color: 'rgb(var(--text-muted))' }}>
-              Target duration
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {operatorNotes && (
-        <div className="mt-4 pt-4 border-t" style={{ borderColor: 'rgb(var(--border-subtle))' }}>
-          <button
-            onClick={() => setShowNotes(!showNotes)}
-            className="flex items-center gap-2 text-sm font-medium w-full"
-            style={{ color: 'rgb(var(--text-secondary))' }}
-          >
-            <Info className="w-4 h-4" style={{ color: 'rgb(var(--accent-primary))' }} />
-            Operator Notes
-            {showNotes ? (
-              <ChevronDown className="w-4 h-4 ml-auto" />
-            ) : (
-              <ChevronRight className="w-4 h-4 ml-auto" />
-            )}
-          </button>
-          {showNotes && (
-            <p
-              className="mt-2 text-sm p-3 rounded-lg"
-              style={{
-                background: 'rgb(var(--surface-base))',
-                color: 'rgb(var(--text-secondary))',
-                whiteSpace: 'pre-wrap',
-              }}
-            >
-              {operatorNotes}
-            </p>
-          )}
-        </div>
-      )}
     </div>
   );
 }
