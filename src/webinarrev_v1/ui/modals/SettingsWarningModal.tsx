@@ -5,7 +5,6 @@ interface SettingsWarningModalProps {
   isOpen: boolean;
   warnings: MissingSettingsWarning[];
   onClose: () => void;
-  onProceedAnyway: () => void;
   onGoToSettings: () => void;
 }
 
@@ -13,7 +12,6 @@ export function SettingsWarningModal({
   isOpen,
   warnings,
   onClose,
-  onProceedAnyway,
   onGoToSettings,
 }: SettingsWarningModalProps) {
   if (!isOpen || warnings.length === 0) return null;
@@ -40,11 +38,10 @@ export function SettingsWarningModal({
           </div>
           <div className="flex-1">
             <h3 className="text-lg font-semibold mb-1" style={{ color: 'rgb(var(--text-primary))' }}>
-              Settings Recommended
+              Settings Required
             </h3>
             <p className="text-sm" style={{ color: 'rgb(var(--text-secondary))' }}>
-              {warnings.length} setting{warnings.length !== 1 ? 's' : ''} not configured. Generated
-              content will include placeholders.
+              {warnings.length} setting{warnings.length !== 1 ? 's' : ''} must be configured before generating content.
             </p>
           </div>
           <button
@@ -80,19 +77,8 @@ export function SettingsWarningModal({
 
         <div className="flex gap-3">
           <button
-            onClick={onProceedAnyway}
-            className="flex-1 px-4 py-2.5 rounded-lg font-medium text-sm transition-colors"
-            style={{
-              background: 'transparent',
-              border: '1px solid rgb(var(--border-default))',
-              color: 'rgb(var(--text-primary))',
-            }}
-          >
-            Generate Anyway
-          </button>
-          <button
             onClick={onGoToSettings}
-            className="flex-1 px-4 py-2.5 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2"
+            className="w-full px-4 py-2.5 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2"
             style={{
               background: 'rgb(var(--accent-primary))',
               color: 'white',

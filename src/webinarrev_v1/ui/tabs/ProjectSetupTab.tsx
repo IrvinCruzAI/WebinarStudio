@@ -211,14 +211,9 @@ export function ProjectSetupTab({
     }
   };
 
-  const handleGenerateAnyway = () => {
-    setShowSettingsWarning(false);
-    onRunPipeline();
-  };
-
   const handleConfigureSettings = () => {
     setShowSettingsWarning(false);
-    setExpandedSections(prev => new Set(prev).add('operator'));
+    setExpandedSections(prev => new Set(prev).add('links'));
   };
 
   const handleSaveTranscripts = async () => {
@@ -767,8 +762,7 @@ export function ProjectSetupTab({
         isOpen={showSettingsWarning}
         warnings={settingsWarnings}
         onClose={() => setShowSettingsWarning(false)}
-        onGenerateAnyway={handleGenerateAnyway}
-        onConfigureSettings={handleConfigureSettings}
+        onGoToSettings={handleConfigureSettings}
       />
     </div>
   );

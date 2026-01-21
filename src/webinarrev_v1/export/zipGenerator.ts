@@ -112,6 +112,16 @@ export async function generateExportZip(
     if (!artifact || !artifact.validated) continue;
 
     const sanitized = sanitizeForClient(id, artifact.content);
+
+    // Validate sanitized output is not empty
+    if (!sanitized || (typeof sanitized === 'object' && Object.keys(sanitized).length === 0)) {
+      console.error(`[zipGenerator] ${id} sanitized to empty output - blocking export`);
+      throw new Error(
+        `Export failed: ${id} produced empty content after sanitization. ` +
+        `This is a system issue - please report to support.`
+      );
+    }
+
     const filename = getDeliverableFilename(id);
 
     if (sanitized) {

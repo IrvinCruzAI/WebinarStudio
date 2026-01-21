@@ -171,7 +171,54 @@ export async function attemptRepair<T>(
       if (attempt === effectiveMaxAttempts - 1) {
         console.error(`Repair failed after ${effectiveMaxAttempts} attempts for ${context.deliverableId}`);
         console.error('Final errors:', errors);
-        throw error;
+
+        // Translate errors to plain English for operator
+        const translatedErrors = error instanceof z.ZodError
+          ? error.issues.map(issue => {
+              const path = issue.path.join('.');
+
+              // Translate common patterns to plain English
+              if (path.includes('block_id') || issue.message.includes('enum')) {
+                return 'Block IDs must be exactly B01-B21 with leading zeros';
+              }
+              if (path.includes('email_id')) {
+                return 'Email IDs must be E01-E10 with leading zeros';
+              }
+              if (path.includes('social_id')) {
+                return 'Social IDs must use two digits (S01-S18)';
+              }
+              if (path.includes('checklist_id')) {
+                return 'Checklist IDs must use 3 digits (CL_pre_001, CL_live_001, CL_post_001)';
+              }
+              if (path.includes('gamma_prompt') && issue.message.includes('100')) {
+                return 'Deck prompt must be at least 100 characters';
+              }
+              if (issue.code === 'invalid_type') {
+                return `Field "${path}" has wrong type (expected ${issue.expected || 'correct type'})`;
+              }
+              if (issue.code === 'too_small' && path === 'blocks') {
+                return 'Framework must have exactly 21 blocks';
+              }
+              if (issue.code === 'too_small' && path === 'emails') {
+                return 'Email campaign must have 8-10 emails';
+              }
+
+              // Fallback to simplified version
+              return `${path}: ${issue.message}`;
+            })
+          : [error instanceof Error ? error.message : String(error)];
+
+        // Create operator-friendly error
+        const operatorError = new Error(
+          `Failed to generate valid ${context.deliverableId} after ${effectiveMaxAttempts} repair attempts. ` +
+          `Issues: ${translatedErrors.slice(0, 3).join('; ')}${translatedErrors.length > 3 ? ' (and more)' : ''}`
+        );
+
+        // Attach original error for debugging
+        (operatorError as any).originalError = error;
+        (operatorError as any).translatedErrors = translatedErrors;
+
+        throw operatorError;
       }
 
       console.warn(

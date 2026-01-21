@@ -160,6 +160,20 @@ export function useProjectStore() {
     const project = getProject(state.selectedProjectId);
     if (!project) return;
 
+    // Validate API key before starting pipeline
+    const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+    if (!apiKey || apiKey.trim().length === 0) {
+      setState((s) => ({
+        ...s,
+        error: 'API key not configured',
+        pipelineError: {
+          message: 'API key is missing. Add VITE_OPENROUTER_API_KEY to your .env file and restart the dev server.',
+          errorType: 'api',
+        },
+      }));
+      return;
+    }
+
     const runId = `run_${Date.now()}`;
 
     updateProject(state.selectedProjectId, { run_id: runId });
@@ -286,6 +300,25 @@ export function useProjectStore() {
       edited_at: Date.now(),
     });
 
+    // WR6 (Run of Show) depends on WR2 (Framework 21) block_ids via crosslinks
+    // When WR2 is edited, invalidate WR6 and WR9 (QA Report)
+    if (deliverableId === 'WR2') {
+      const wr6Pointer = project.deliverable_pointers['WR6'];
+      if (wr6Pointer) {
+        updateDeliverablePointer(state.selectedProjectId, 'WR6', {
+          ...wr6Pointer,
+          validated: false,
+        });
+      }
+      const wr9Pointer = project.deliverable_pointers['WR9'];
+      if (wr9Pointer) {
+        updateDeliverablePointer(state.selectedProjectId, 'WR9', {
+          ...wr9Pointer,
+          validated: false,
+        });
+      }
+    }
+
     setState((s) => {
       const newArtifacts = new Map(s.artifacts);
       newArtifacts.set(deliverableId, {
@@ -294,6 +327,19 @@ export function useProjectStore() {
         validated: false,
         edited_at: Date.now(),
       });
+
+      // Also mark dependent artifacts as unvalidated in state
+      if (deliverableId === 'WR2') {
+        const wr6 = newArtifacts.get('WR6');
+        if (wr6) {
+          newArtifacts.set('WR6', { ...wr6, validated: false });
+        }
+        const wr9 = newArtifacts.get('WR9');
+        if (wr9) {
+          newArtifacts.set('WR9', { ...wr9, validated: false });
+        }
+      }
+
       return { ...s, artifacts: newArtifacts };
     });
   }, [state.selectedProjectId, state.artifacts]);

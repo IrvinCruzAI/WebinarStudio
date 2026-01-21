@@ -45,6 +45,21 @@ export async function atomicArtifactWrite(
 ): Promise<void> {
   const artifactId = buildArtifactId(projectId, runId, deliverableId);
 
+  // Validate artifact ID format
+  if (!artifactId || artifactId.includes('undefined') || artifactId.includes('null')) {
+    throw new Error(
+      `[atomicArtifactWrite] Invalid artifact_id: "${artifactId}". ` +
+      `projectId=${projectId}, runId=${runId}, deliverableId=${deliverableId}`
+    );
+  }
+
+  const parts = artifactId.split(':');
+  if (parts.length !== 4 || parts.some(p => !p || p.length === 0)) {
+    throw new Error(
+      `[atomicArtifactWrite] Malformed artifact_id: "${artifactId}" (expected 4 non-empty parts)`
+    );
+  }
+
   const existingArtifact = await readArtifact(artifactId);
   const generatedAt = existingArtifact?.generated_at || Date.now();
 

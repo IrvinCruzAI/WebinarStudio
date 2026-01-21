@@ -266,7 +266,29 @@ export function QAExportTab({
     }
   };
 
-  const validIssues = issues.filter(issue => isValidIssue(issue.message, issue.fieldPath));
+  // Filter out malformed issues (containing "undefined", "null", etc.)
+  const validIssues = issues.filter(issue => {
+    // Check for malformed field paths
+    if (issue.fieldPath && (issue.fieldPath.includes('undefined') || issue.fieldPath.includes('null'))) {
+      console.warn('[QAExportTab] Filtered malformed issue (undefined in fieldPath):', {
+        deliverableId: issue.deliverableId,
+        fieldPath: issue.fieldPath,
+        message: issue.message,
+      });
+      return false;
+    }
+
+    // Check for malformed messages
+    if (issue.message.includes('[object Object]') || issue.message.includes('NaN')) {
+      console.warn('[QAExportTab] Filtered malformed issue (object/NaN in message):', {
+        deliverableId: issue.deliverableId,
+        message: issue.message,
+      });
+      return false;
+    }
+
+    return isValidIssue(issue.message, issue.fieldPath);
+  });
 
   const filteredIssues = validIssues.filter(issue => {
     if (filterSeverity !== 'all' && issue.severity !== filterSeverity) return false;
@@ -402,6 +424,34 @@ export function QAExportTab({
             onSelect={() => setSelectedExportType('operator')}
           />
         </div>
+
+        {!eligibility?.canExport && eligibility?.blocking_reasons && eligibility.blocking_reasons.length > 0 && selectedExportType === 'client' && (
+          <div
+            className="p-4 rounded-xl"
+            style={{
+              background: 'rgb(var(--error) / 0.1)',
+              border: '1px solid rgb(var(--error) / 0.2)',
+            }}
+          >
+            <div className="flex items-center gap-2 mb-3">
+              <XCircle className="w-5 h-5" style={{ color: 'rgb(var(--error))' }} />
+              <h4 className="text-sm font-semibold" style={{ color: 'rgb(var(--error))' }}>
+                Export Blocked - Fix These Issues:
+              </h4>
+            </div>
+            <ul className="space-y-2">
+              {eligibility.blocking_reasons.map((reason, i) => (
+                <li key={i} className="flex items-start gap-2 text-xs" style={{ color: 'rgb(var(--text-secondary))' }}>
+                  <span
+                    className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0"
+                    style={{ background: 'rgb(var(--error))' }}
+                  />
+                  <span>{translateBlockingReason(reason)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div className="flex items-center justify-between">
           <div className="text-sm" style={{ color: 'rgb(var(--text-muted))' }}>
@@ -871,6 +921,32 @@ function BugAlertSection({ count }: { count: number }) {
       )}
     </div>
   );
+}
+
+function translateBlockingReason(reason: string): string {
+  if (reason.includes('critical_placeholders_present')) {
+    const match = reason.match(/\((\d+)\)/);
+    const count = match ? match[1] : 'some';
+    return `${count} critical placeholder${count === '1' ? '' : 's'} must be filled`;
+  }
+  if (reason.includes('_schema_invalid')) {
+    const id = reason.split('_')[0];
+    return `${id} has validation errors`;
+  }
+  if (reason.includes('_crosslink_invalid')) {
+    const id = reason.split('_')[0];
+    return `${id} has invalid references`;
+  }
+  if (reason.includes('_missing')) {
+    const id = reason.split('_')[0];
+    return `${id} was not generated`;
+  }
+  if (reason.includes('readiness_score_below_threshold')) {
+    const match = reason.match(/\((\d+)\)/);
+    const score = match ? match[1] : '?';
+    return `Readiness score too low (${score}% - need 70%+)`;
+  }
+  return reason; // Fallback to raw if no match
 }
 
 interface GroupedPlaceholder {
