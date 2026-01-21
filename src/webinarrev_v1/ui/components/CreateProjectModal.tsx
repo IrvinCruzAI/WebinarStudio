@@ -176,6 +176,7 @@ export default function CreateProjectModal({
                     ctaMode: e.target.value as CTA,
                   })
                 }
+                aria-label="CTA Mode"
                 className="w-full px-4 py-3 rounded-lg bg-slate-900 border border-slate-700 text-white focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none transition-colors"
               >
                 <option value="book_call">Book Call</option>
@@ -196,6 +197,7 @@ export default function CreateProjectModal({
                     audienceTemperature: e.target.value as AudienceTemperature,
                   })
                 }
+                aria-label="Audience Temperature"
                 className="w-full px-4 py-3 rounded-lg bg-slate-900 border border-slate-700 text-white focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none transition-colors"
               >
                 <option value="cold">Cold</option>

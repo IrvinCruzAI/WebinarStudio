@@ -306,6 +306,7 @@ const WebinarIntakeForm: React.FC = () => {
                     name="primaryCTAType"
                     value={formData.primaryCTAType || 'book_call'}
                     onChange={handleInputChange}
+                    aria-label="Primary CTA Type"
                     className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                   >
                     <option value="book_call">Book a Call</option>
@@ -338,6 +339,7 @@ const WebinarIntakeForm: React.FC = () => {
                   name="tone"
                   value={formData.tone || 'Professional'}
                   onChange={handleInputChange}
+                  aria-label="Desired Tone"
                   className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                 >
                   <option value="Professional">Professional</option>

@@ -125,6 +125,7 @@ export function ProjectsHome({
             <select
               value={sortBy}
               onChange={e => setSortBy(e.target.value as SortOption)}
+              aria-label="Sort projects by"
               className="btn-secondary text-sm appearance-none cursor-pointer pr-8"
               style={{ backgroundImage: 'none' }}
             >

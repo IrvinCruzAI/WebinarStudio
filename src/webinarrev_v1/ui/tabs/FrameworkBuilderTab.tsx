@@ -216,6 +216,7 @@ export function FrameworkBuilderTab({
                 <select
                   value={jumpToBlock}
                   onChange={(e) => handleJumpToBlock(e.target.value)}
+                  aria-label="Jump to block"
                   className="input-field text-sm py-2 pr-8 appearance-none cursor-pointer"
                   style={{ minWidth: '160px' }}
                 >

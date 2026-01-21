@@ -462,6 +462,7 @@ export function ProjectSetupTab({
                 <select
                   value={editedCtaMode}
                   onChange={(e) => setEditedCtaMode(e.target.value as CTA)}
+                  aria-label="CTA Mode"
                   className="w-full px-2 py-1.5 text-sm rounded-lg"
                   style={{
                     background: 'rgb(var(--surface-elevated))',
@@ -488,6 +489,7 @@ export function ProjectSetupTab({
                 <select
                   value={editedAudienceTemp}
                   onChange={(e) => setEditedAudienceTemp(e.target.value as AudienceTemperature)}
+                  aria-label="Audience Temperature"
                   className="w-full px-2 py-1.5 text-sm rounded-lg"
                   style={{
                     background: 'rgb(var(--surface-elevated))',
