@@ -6,7 +6,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-100%25-blue)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-18-blue)](https://reactjs.org/)
 
-**[For Recruiters](#portfolio-analysis)** | **[Tech Stack](#tech-stack)** | **[System Architecture](#system-architecture)**
+**[Live Demo](https://webinarstudio.bolt.host)** | **[For Recruiters](#portfolio-analysis)** | **[Tech Stack](#tech-stack)** | **[System Architecture](#system-architecture)**
 
 A [FutureCrafters](https://www.futurecrafters.ai) Production System • Built by [Irvin Cruz](https://irvincruz.com)
 
