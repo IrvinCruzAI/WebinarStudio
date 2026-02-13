@@ -12,8 +12,11 @@ A [FutureCrafters](https://www.futurecrafters.ai) Production System • Built by
 
 ---
 
-![WebinarStudio - Enterprise webinar content pipeline with AI-powered document generation](assets/hero-screenshot.png)
-*Generate landing pages, email sequences, run-of-show documents, and checklists from webinar content — Live demo at [webinarstudio.bolt.host](https://webinarstudio.bolt.host)*
+<p align="center">
+  <img src="https://raw.githubusercontent.com/IrvinCruzAI/WebinarStudio/main/assets/hero-screenshot.png" alt="WebinarStudio Platform" width="100%">
+</p>
+
+<p align="center"><em>Generate landing pages, email sequences, run-of-show documents, and checklists from webinar content — Live demo at <a href="https://webinarstudio.bolt.host">webinarstudio.bolt.host</a></em></p>
 
 ---
 
