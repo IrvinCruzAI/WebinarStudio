@@ -6,7 +6,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-100%25-blue)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-18-blue)](https://reactjs.org/)
 
-**[Live Demo](https://webinarstudio.bolt.host)** | **[For Recruiters](#portfolio-analysis)** | **[Tech Stack](#tech-stack)** | **[System Architecture](#system-architecture)**
+**[Live Demo](https://webinarstudio.bolt.host)** | **[Tech Stack](#tech-stack)** | **[System Architecture](#system-architecture)**
 
 A [FutureCrafters](https://www.futurecrafters.ai) Production System • Built by [Irvin Cruz](https://irvincruz.com)
 
@@ -18,7 +18,7 @@ A [FutureCrafters](https://www.futurecrafters.ai) Production System • Built by
 
 **Why Enterprise-Grade:** QA validation system, structured schema validation (Zod), pipeline orchestration, Supabase backend, document generation (.docx export), and comprehensive error handling.
 
-**For Recruiters:** Demonstrates systems architecture thinking, production-quality TypeScript, database design, AI pipeline orchestration, and enterprise software patterns.
+**Technical Showcase:** Demonstrates systems architecture thinking, production-quality TypeScript, database design, AI pipeline orchestration, and enterprise software patterns.
 
 **Tech:** React 18 + TypeScript + Vite + Supabase + Zod + Zustand + Document generation (docx) + AI pipeline orchestration.
 
@@ -85,7 +85,7 @@ A [FutureCrafters](https://www.futurecrafters.ai) Production System • Built by
 
 ## Portfolio Analysis
 
-> **For Recruiters & Hiring Managers**
+## Technical Overview
 
 ### What This Project Demonstrates
 
@@ -482,9 +482,10 @@ WebinarStudio is a production system from FutureCrafters' portfolio of AI-powere
 
 ---
 
-**For recruiters:** Demonstrates enterprise systems architecture—pipeline orchestration, QA validation, database design, and production-quality TypeScript.
 
 ---
 
 *A FutureCrafters Production System • Built by [Irvin Cruz](https://irvincruz.com) ☀️*  
 *Last Updated: February 2026*
+
+
