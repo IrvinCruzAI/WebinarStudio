@@ -446,7 +446,6 @@ WebinarStudio is a production system from FutureCrafters' portfolio of AI-powere
 **More Projects:**
 - [NewsGen AI](https://github.com/IrvinCruzAI/AI_News_Generator) — News-to-article generator (75% cost optimized)
 - [Marketing Dashboard](https://github.com/IrvinCruzAI/Marketing_Dashboard) — 6 AI marketing generators with business context engine
-- Mission Control — Real-time business intelligence dashboard
 - Rory — AI content engine with custom voice modeling
 - Nexus — LinkedIn network intelligence
 
