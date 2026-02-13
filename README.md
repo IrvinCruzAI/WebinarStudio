@@ -12,14 +12,6 @@ A [FutureCrafters](https://www.futurecrafters.ai) Production System • Built by
 
 ---
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/IrvinCruzAI/WebinarStudio/main/assets/hero-screenshot.png" alt="WebinarStudio Platform" width="100%">
-</p>
-
-<p align="center"><em>Generate landing pages, email sequences, run-of-show documents, and checklists from webinar content — Live demo at <a href="https://webinarstudio.bolt.host">webinarstudio.bolt.host</a></em></p>
-
----
-
 ## TL;DR (30-Second Scan)
 
 **What:** Complete webinar content generation pipeline. Takes webinar recordings/transcripts and generates 8+ deliverables: landing pages, email sequences, run-of-show documents, speaker checklists, social posts, and more.
